@@ -1,15 +1,20 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import CoordinatePicker from '../components/CoordinatePicker'
 import { supabase } from '../lib/supabase'
+import { createPlace, fetchHistoricalPeriods, insertPlaceImage } from '../services/places'
 
 const initialForm = {
   title: '',
-  description: '',
+  short_description: '',
+  long_description: '',
   latitude: '',
   longitude: '',
   start_year: '',
   end_year: '',
-  period_label: '',
+  period_id: '',
+  visited: false,
+  image: null,
 }
 
 function AddPlace() {
@@ -17,10 +22,40 @@ function AddPlace() {
   const [form, setForm] = useState(initialForm)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [periods, setPeriods] = useState([])
+
+  useEffect(() => {
+    async function loadPeriods() {
+      const { data, error: supabaseError } = await fetchHistoricalPeriods()
+      if (!supabaseError) {
+        setPeriods(data ?? [])
+      }
+    }
+
+    loadPeriods()
+  }, [])
 
   function updateField(event) {
     const { name, value } = event.target
     setForm((current) => ({ ...current, [name]: value }))
+  }
+
+  function updateCheckbox(event) {
+    const { name, checked } = event.target
+    setForm((current) => ({ ...current, [name]: checked }))
+  }
+
+  function updateImage(event) {
+    const file = event.target.files?.[0] ?? null
+    setForm((current) => ({ ...current, image: file }))
+  }
+
+  function updateCoordinates({ latitude, longitude }) {
+    setForm((current) => ({
+      ...current,
+      latitude: latitude.toFixed(6),
+      longitude: longitude.toFixed(6),
+    }))
   }
 
   async function handleSubmit(event) {
@@ -32,8 +67,13 @@ function AddPlace() {
     const startYear = Number(form.start_year)
     const endYear = Number(form.end_year)
 
-    if (!form.title.trim() || !form.description.trim() || !form.period_label.trim()) {
-      setError('Please fill in the title, description, and period label.')
+    if (!form.title.trim() || !form.short_description.trim() || !form.long_description.trim()) {
+      setError('Please fill in the title, short description, and long description.')
+      return
+    }
+
+    if (!form.period_id) {
+      setError('Please select a historical period.')
       return
     }
 
@@ -59,25 +99,43 @@ function AddPlace() {
 
     setSaving(true)
 
-    const { error: supabaseError } = await supabase.from('places').insert([
-      {
-        title: form.title.trim(),
-        description: form.description.trim(),
-        latitude,
-        longitude,
-        start_year: startYear,
-        end_year: endYear,
-        period_label: form.period_label.trim(),
-      },
-    ])
-
-    setSaving(false)
+    const { data, error: supabaseError } = await createPlace({
+      title: form.title.trim(),
+      short_description: form.short_description.trim(),
+      long_description: form.long_description.trim(),
+      latitude,
+      longitude,
+      start_year: startYear,
+      end_year: endYear,
+      period_id: Number(form.period_id),
+      visited: form.visited,
+    })
 
     if (supabaseError) {
+      setSaving(false)
       setError(supabaseError.message)
       return
     }
 
+    if (form.image && data?.id) {
+      const filePath = `places/${data.id}/${Date.now()}-${form.image.name}`
+      const { error: uploadError } = await supabase.storage
+        .from('place-images')
+        .upload(filePath, form.image, { upsert: true })
+
+      if (!uploadError) {
+        const { data: publicData } = supabase.storage.from('place-images').getPublicUrl(filePath)
+        await insertPlaceImage({
+          place_id: data.id,
+          image_url: publicData?.publicUrl,
+          thumbnail_url: publicData?.publicUrl,
+          caption: form.title.trim(),
+          is_primary: true,
+        })
+      }
+    }
+
+    setSaving(false)
     navigate('/')
   }
 
@@ -86,7 +144,7 @@ function AddPlace() {
       <section className="panel">
         <div className="panel-header">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-300/80">
-            Admin form
+            Add location
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">Add a place</h1>
           <p className="mt-3 text-sm leading-6 text-slate-300">
@@ -114,12 +172,23 @@ function AddPlace() {
             </label>
 
             <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-200">Description</span>
+              <span className="text-sm font-medium text-slate-200">Short description</span>
               <textarea
                 className="min-h-36 w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                name="description"
+                name="short_description"
                 required
-                value={form.description}
+                value={form.short_description}
+                onChange={updateField}
+              />
+            </label>
+
+            <label className="space-y-2 md:col-span-2">
+              <span className="text-sm font-medium text-slate-200">Long description</span>
+              <textarea
+                className="min-h-40 w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
+                name="long_description"
+                required
+                value={form.long_description}
                 onChange={updateField}
               />
             </label>
@@ -175,14 +244,53 @@ function AddPlace() {
             </label>
 
             <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-200">Period label</span>
-              <input
-                className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                name="period_label"
+              <span className="text-sm font-medium text-slate-200">Historical period</span>
+              <select
+                className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
+                name="period_id"
                 required
-                value={form.period_label}
+                value={form.period_id}
                 onChange={updateField}
+              >
+                <option value="">Select a period</option>
+                {periods.map((period) => (
+                  <option key={period.id} value={period.id}>
+                    {period.name} ({period.start_year} → {period.end_year})
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="space-y-2 md:col-span-2">
+              <span className="text-sm font-medium text-slate-200">Coordinate picker</span>
+              <CoordinatePicker
+                value={{
+                  latitude: form.latitude ? Number(form.latitude) : null,
+                  longitude: form.longitude ? Number(form.longitude) : null,
+                }}
+                onChange={updateCoordinates}
               />
+            </label>
+
+            <label className="space-y-2 md:col-span-2">
+              <span className="text-sm font-medium text-slate-200">Primary image</span>
+              <input
+                className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none file:mr-4 file:rounded-full file:border-0 file:bg-cyan-400 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-950"
+                type="file"
+                accept="image/*"
+                onChange={updateImage}
+              />
+            </label>
+
+            <label className="flex items-center gap-3 md:col-span-2">
+              <input
+                checked={form.visited}
+                className="h-4 w-4 rounded border-slate-700 bg-slate-950 text-cyan-400"
+                name="visited"
+                type="checkbox"
+                onChange={updateCheckbox}
+              />
+              <span className="text-sm text-slate-200">Mark as visited</span>
             </label>
           </div>
 
@@ -195,7 +303,9 @@ function AddPlace() {
               {saving ? 'Saving…' : 'Save place'}
             </button>
 
-            <p className="text-sm text-slate-400">Uses Supabase insert on the frontend only.</p>
+            <p className="text-sm text-slate-400">
+              Uses Supabase inserts and storage uploads on the frontend only.
+            </p>
           </div>
         </form>
       </section>

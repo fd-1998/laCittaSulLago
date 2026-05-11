@@ -1,9 +1,9 @@
-import { createContext, createElement, useContext, useMemo, useState } from 'react'
+import { createContext, createElement, useContext, useEffect, useMemo, useState } from 'react'
 
 const TimelineContext = createContext(null)
 
 export const YEAR_MIN = -60000
-export const YEAR_MAX = 2026
+export const YEAR_MAX = new Date().getFullYear()
 
 const periodBands = [
   { min: -60000, max: -3000, label: 'Paleolithic' },
@@ -47,17 +47,40 @@ export function filterPlacesByYear(places, year) {
 }
 
 export function TimelineProvider({ children }) {
-  const [selectedYear, setSelectedYear] = useState(YEAR_MAX)
+  const [years, setYears] = useState([YEAR_MAX])
+  const [selectedYearIndex, setSelectedYearIndex] = useState(0)
+  const [timelineEnabled, setTimelineEnabled] = useState(false)
+
+  useEffect(() => {
+    if (years.length === 0) {
+      setSelectedYearIndex(0)
+      return
+    }
+
+    setSelectedYearIndex((current) => {
+      if (current >= 0 && current < years.length) {
+        return current
+      }
+
+      return years.length - 1
+    })
+  }, [years])
+
+  const selectedYear = years[selectedYearIndex] ?? years[years.length - 1] ?? YEAR_MAX
 
   const value = useMemo(
     () => ({
+      years,
+      setYears,
       selectedYear,
-      setSelectedYear,
-      yearRange: { min: YEAR_MIN, max: YEAR_MAX },
+      selectedYearIndex,
+      setSelectedYearIndex,
+      timelineEnabled,
+      setTimelineEnabled,
       selectedLabel: getTimelineLabel(selectedYear),
       formatTimelineYear,
     }),
-    [selectedYear],
+    [selectedYear, selectedYearIndex, timelineEnabled, years],
   )
 
   return createElement(TimelineContext.Provider, { value }, children)

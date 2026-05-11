@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { fetchPlaceById } from '../services/places'
 
 function PlaceDetail() {
   const { id } = useParams()
@@ -15,11 +15,7 @@ function PlaceDetail() {
       setLoading(true)
       setError('')
 
-      const { data, error: supabaseError } = await supabase
-        .from('places')
-        .select('*')
-        .eq('id', id)
-        .single()
+      const { data, error: supabaseError } = await fetchPlaceById(id)
 
       if (!isMounted) {
         return
@@ -41,6 +37,14 @@ function PlaceDetail() {
       isMounted = false
     }
   }, [id])
+
+  const primaryImage = useMemo(() => {
+    if (!place) {
+      return null
+    }
+
+    return place.place_images?.find((image) => image.is_primary) ?? place.place_images?.[0]
+  }, [place])
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-4 sm:px-6 lg:px-8 lg:py-8">
@@ -80,12 +84,20 @@ function PlaceDetail() {
               <div className="space-y-4">
                 <div>
                   <p className="text-xs uppercase tracking-[0.18em] text-cyan-300/70">
-                    {place.period_label || 'Historical place'}
+                    {place.historical_periods?.name || 'Historical place'}
                   </p>
                   <h2 className="mt-2 text-3xl font-semibold text-white">{place.title}</h2>
                 </div>
 
-                <p className="text-base leading-7 text-slate-300">{place.description}</p>
+                {primaryImage?.image_url ? (
+                  <img
+                    alt={primaryImage.caption || place.title}
+                    className="h-56 w-full rounded-2xl object-cover"
+                    src={primaryImage.image_url}
+                  />
+                ) : null}
+
+                <p className="text-base leading-7 text-slate-300">{place.long_description}</p>
 
                 <Link
                   to="/"
@@ -112,7 +124,9 @@ function PlaceDetail() {
 
                 <div>
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Period label</p>
-                  <p className="mt-1 text-sm font-medium text-slate-200">{place.period_label}</p>
+                  <p className="mt-1 text-sm font-medium text-slate-200">
+                    {place.historical_periods?.name}
+                  </p>
                 </div>
               </aside>
             </article>

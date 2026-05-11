@@ -1,47 +1,24 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import TimelineSlider from '../components/TimelineSlider'
-import { filterPlacesByYear, useTimeline } from '../context/TimelineContext'
-import { supabase } from '../lib/supabase'
+import { isPlaceVisibleAtYear, useTimeline } from '../context/TimelineContext'
+import usePlacesData from '../hooks/usePlacesData'
 
 function TimelinePage() {
-  const [places, setPlaces] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const { selectedYear } = useTimeline()
+  const { selectedYear, timelineEnabled, setTimelineEnabled } = useTimeline()
+  const { places, periods, loading, error } = usePlacesData()
 
   useEffect(() => {
-    let isMounted = true
-
-    async function loadPlaces() {
-      setLoading(true)
-      setError('')
-
-      const { data, error: supabaseError } = await supabase.from('places').select('*')
-
-      if (!isMounted) {
-        return
-      }
-
-      if (supabaseError) {
-        setError(supabaseError.message)
-        setLoading(false)
-        return
-      }
-
-      setPlaces(data ?? [])
-      setLoading(false)
+    if (!timelineEnabled) {
+      setTimelineEnabled(true)
     }
-
-    loadPlaces()
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
+  }, [setTimelineEnabled, timelineEnabled])
 
   const visiblePlaces = useMemo(
-    () => filterPlacesByYear(places, selectedYear).sort((a, b) => a.start_year - b.start_year),
+    () =>
+      places
+        .filter((place) => isPlaceVisibleAtYear(place, selectedYear))
+        .sort((a, b) => a.start_year - b.start_year),
     [places, selectedYear],
   )
 
@@ -59,7 +36,7 @@ function TimelinePage() {
               </h1>
             </div>
             <div className="panel-body space-y-4">
-              <TimelineSlider />
+              <TimelineSlider periods={periods} />
 
               <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-300">
                 {visiblePlaces.length} places are active in the selected year.
@@ -106,10 +83,10 @@ function TimelinePage() {
                   className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 shadow-lg shadow-black/10"
                 >
                   <p className="text-xs uppercase tracking-[0.18em] text-cyan-300/70">
-                    {place.period_label || 'Historical place'}
+                    {place.historical_periods?.name || 'Historical place'}
                   </p>
                   <h3 className="mt-2 text-lg font-semibold text-white">{place.title}</h3>
-                  <p className="mt-3 text-sm leading-6 text-slate-300">{place.description}</p>
+                  <p className="mt-3 text-sm leading-6 text-slate-300">{place.short_description}</p>
                   <p className="mt-4 text-xs text-slate-500">
                     {place.start_year} → {place.end_year}
                   </p>

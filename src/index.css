@@ -38,6 +38,23 @@
     background: rgba(56, 189, 248, 0.35);
     color: white;
   }
+
+  .leaflet-container {
+    font: inherit;
+  }
+
+  .map-tooltip {
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 16px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+    padding: 0.6rem 0.75rem;
+    color: #e2e8f0;
+  }
+
+  .map-tooltip::before {
+    border-top-color: rgba(15, 23, 42, 0.92);
+  }
 }
 
 @layer components {

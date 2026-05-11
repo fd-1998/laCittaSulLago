@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import marker2x from 'leaflet/dist/images/marker-icon-2x.png'
@@ -14,24 +14,10 @@ L.Icon.Default.mergeOptions({
 
 const DEFAULT_CENTER = [45.856, 9.391]
 
-function Map({ places = [], selectedYear }) {
+function Map({ places = [], onSelectPlace, activePlaceId }) {
   const mapContainerRef = useRef(null)
   const mapInstanceRef = useRef(null)
   const markerLayerRef = useRef(L.layerGroup())
-
-  const visiblePlaces = useMemo(() => {
-    return places.filter((place) => {
-      const startYear = Number(place.start_year)
-      const endYear = Number(place.end_year)
-
-      return (
-        !Number.isNaN(startYear) &&
-        !Number.isNaN(endYear) &&
-        startYear <= selectedYear &&
-        selectedYear <= endYear
-      )
-    })
-  }, [places, selectedYear])
 
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) {
@@ -65,28 +51,55 @@ function Map({ places = [], selectedYear }) {
 
     markerLayerRef.current.clearLayers()
 
-    visiblePlaces.forEach((place) => {
+    places.forEach((place) => {
       if (place.latitude == null || place.longitude == null) {
         return
       }
 
-      const popupHtml = `
+      const period = place.historical_periods
+      const periodColor = period?.color || '#38bdf8'
+      const isVisited = Boolean(place.visited)
+      const displayImage =
+        place.place_images?.find((image) => image.is_primary)?.thumbnail_url ||
+        place.place_images?.[0]?.thumbnail_url
+
+      const tooltipHtml = `
         <div style="min-width: 220px; max-width: 280px; font-family: system-ui, sans-serif;">
-          <h3 style="margin: 0 0 4px; font-size: 16px;">${place.title ?? 'Untitled place'}</h3>
-          <p style="margin: 0 0 6px; font-size: 12px; color: #64748b;">${place.period_label ?? 'Historical location'}</p>
-          <p style="margin: 0 0 10px; font-size: 13px; line-height: 1.45;">${(place.description ?? '').slice(0, 140)}</p>
-          <a href="/place/${place.id}" style="color: #0f766e; font-weight: 600; text-decoration: none;">Open details →</a>
+          ${
+            displayImage
+              ? `<img src="${displayImage}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 12px; margin-bottom: 8px;" />`
+              : ''
+          }
+          <h3 style="margin: 0 0 4px; font-size: 15px;">${place.title ?? 'Untitled place'}</h3>
+          <p style="margin: 0 0 6px; font-size: 12px; color: #94a3b8;">${period?.name ?? 'Historical location'}</p>
+          <p style="margin: 0; font-size: 12px; line-height: 1.45; color: #cbd5f5;">${
+            (place.short_description ?? '').slice(0, 120)
+          }</p>
         </div>
       `
 
-      L.marker([place.latitude, place.longitude])
-        .bindPopup(popupHtml, { maxWidth: 320 })
-        .addTo(markerLayerRef.current)
+      const marker = L.circleMarker([place.latitude, place.longitude], {
+        radius: activePlaceId === place.id ? 10 : 7,
+        color: isVisited ? '#22d3ee' : periodColor,
+        fillColor: isVisited ? '#22d3ee' : periodColor,
+        fillOpacity: isVisited ? 0.75 : 0.6,
+        weight: 2,
+      })
+
+      marker.on('click', () => onSelectPlace?.(place))
+      marker.bindTooltip(tooltipHtml, {
+        direction: 'top',
+        offset: [0, -8],
+        opacity: 0.95,
+        className: 'map-tooltip',
+      })
+
+      marker.addTo(markerLayerRef.current)
     })
 
-    if (visiblePlaces.length > 0) {
+    if (places.length > 0) {
       const bounds = L.latLngBounds(
-        visiblePlaces
+        places
           .filter((place) => place.latitude != null && place.longitude != null)
           .map((place) => [place.latitude, place.longitude]),
       )
@@ -95,7 +108,7 @@ function Map({ places = [], selectedYear }) {
         mapInstanceRef.current.fitBounds(bounds.pad(0.2), { animate: false })
       }
     }
-  }, [visiblePlaces])
+  }, [places, activePlaceId, onSelectPlace])
 
   return <div ref={mapContainerRef} className="h-full min-h-[70vh] w-full rounded-3xl" />
 }

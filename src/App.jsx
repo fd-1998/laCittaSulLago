@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import AddPlace from './pages/AddPlace'
 import HomeMap from './pages/HomeMap'
+import NotesPage from './pages/NotesPage'
+import PodcastsPage from './pages/PodcastsPage'
 import PlaceDetail from './pages/PlaceDetail'
 import TimelinePage from './pages/TimelinePage'
 
@@ -13,7 +15,9 @@ function App() {
       <Routes>
         <Route path="/" element={<HomeMap />} />
         <Route path="/timeline" element={<TimelinePage />} />
-        <Route path="/add" element={<AddPlace />} />
+        <Route path="/podcasts" element={<PodcastsPage />} />
+        <Route path="/notes" element={<NotesPage />} />
+        <Route path="/add-location" element={<AddPlace />} />
         <Route path="/place/:id" element={<PlaceDetail />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
