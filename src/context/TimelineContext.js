@@ -1,4 +1,4 @@
-import { createContext, createElement, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, createElement, useContext, useMemo, useState } from 'react'
 
 const TimelineContext = createContext(null)
 
@@ -48,23 +48,15 @@ export function filterPlacesByYear(places, year) {
 
 export function TimelineProvider({ children }) {
   const [years, setYears] = useState([YEAR_MAX])
-  const [selectedYearIndex, setSelectedYearIndex] = useState(0)
+  const [selectedYearIndexState, setSelectedYearIndex] = useState(0)
   const [timelineEnabled, setTimelineEnabled] = useState(false)
-
-  useEffect(() => {
+  const selectedYearIndex = useMemo(() => {
     if (years.length === 0) {
-      setSelectedYearIndex(0)
-      return
+      return 0
     }
 
-    setSelectedYearIndex((current) => {
-      if (current >= 0 && current < years.length) {
-        return current
-      }
-
-      return years.length - 1
-    })
-  }, [years])
+    return Math.min(Math.max(selectedYearIndexState, 0), years.length - 1)
+  }, [selectedYearIndexState, years])
 
   const selectedYear = years[selectedYearIndex] ?? years[years.length - 1] ?? YEAR_MAX
 

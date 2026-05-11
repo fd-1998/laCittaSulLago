@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useTimeline } from '../context/TimelineContext'
+import { FilterIcon, TimelineIcon } from './UiIcons'
 
 function TimelineSlider({ periods = [] }) {
   const {
@@ -24,67 +25,62 @@ function TimelineSlider({ periods = [] }) {
 
   if (!timelineEnabled) {
     return (
-      <div className="panel">
-        <div className="panel-header">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-300/80">
-            Timeline
-          </p>
-          <h2 className="mt-1 text-lg font-semibold text-white">Timeline disabled</h2>
-        </div>
-        <div className="panel-body space-y-3">
-          <p className="text-sm text-slate-300">
-            Enable the historical timeline to snap between years that exist in the database.
-          </p>
-          <button
-            className="inline-flex items-center justify-center rounded-full bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
-            type="button"
-            onClick={() => setTimelineEnabled(true)}
-          >
-            Enable timeline
-          </button>
-        </div>
-      </div>
+      <button
+        className="flex w-full items-center justify-between gap-3 rounded-3xl border border-slate-800/80 bg-slate-950/70 px-4 py-4 text-left shadow-lg transition hover:border-cyan-400/40 hover:bg-slate-900/80"
+        type="button"
+        onClick={() => setTimelineEnabled(true)}
+      >
+        <span className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-400/10 text-cyan-300">
+            <TimelineIcon />
+          </span>
+          <span>
+            <span className="block text-sm font-semibold text-white">Timeline</span>
+            <span className="block text-xs text-slate-400">Tap to enable</span>
+          </span>
+        </span>
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-cyan-400 text-slate-950">
+          <FilterIcon />
+        </span>
+      </button>
     )
   }
 
   return (
-    <div className="panel">
-      <div className="panel-header flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-300/80">
-            Timeline
-          </p>
-          <h2 className="mt-1 text-lg font-semibold text-white">Browse by historical year</h2>
-        </div>
-        <div className="rounded-2xl bg-cyan-400/10 px-4 py-2 text-right">
-          <p className="text-sm font-semibold text-cyan-200">{formatTimelineYear(selectedYear)}</p>
-          <p className="text-xs text-cyan-100/70">{label || 'Historical period'}</p>
-        </div>
-      </div>
+    <div className="rounded-3xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-lg">
+      <button
+        className="mb-4 flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-left transition hover:border-cyan-400/40"
+        type="button"
+        onClick={() => setTimelineEnabled(false)}
+      >
+        <span className="flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-300">
+            <TimelineIcon />
+          </span>
+          <span>
+            <span className="block text-sm font-semibold text-white">{formatTimelineYear(selectedYear)}</span>
+            <span className="block text-xs text-slate-400">{label || 'Historical period'}</span>
+          </span>
+        </span>
+        <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 text-slate-300">
+          <FilterIcon />
+        </span>
+      </button>
 
-      <div className="panel-body space-y-4">
-        <input
-          aria-label="Timeline year"
-          className="timeline-slider h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-700 accent-cyan-400"
-          min={0}
-          max={Math.max(years.length - 1, 0)}
-          step="1"
-          type="range"
-          value={selectedYearIndex}
-          onChange={(event) => setSelectedYearIndex(Number(event.target.value))}
-        />
+      <input
+        aria-label="Timeline year"
+        className="timeline-slider h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-700 accent-cyan-400"
+        min={0}
+        max={Math.max(years.length - 1, 0)}
+        step="1"
+        type="range"
+        value={selectedYearIndex}
+        onChange={(event) => setSelectedYearIndex(Number(event.target.value))}
+      />
 
-        <div className="flex items-center justify-between text-xs text-slate-400">
-          <span>{formatTimelineYear(years[0] ?? selectedYear)}</span>
-          <button
-            className="text-xs text-slate-400 transition hover:text-slate-200"
-            type="button"
-            onClick={() => setTimelineEnabled(false)}
-          >
-            Disable
-          </button>
-          <span>{formatTimelineYear(years[years.length - 1] ?? selectedYear)}</span>
-        </div>
+      <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+        <span>{formatTimelineYear(years[0] ?? selectedYear)}</span>
+        <span>{formatTimelineYear(years[years.length - 1] ?? selectedYear)}</span>
       </div>
     </div>
   )

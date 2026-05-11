@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import AddPlace from './pages/AddPlace'
 import HomeMap from './pages/HomeMap'
@@ -8,9 +8,12 @@ import PlaceDetail from './pages/PlaceDetail'
 import TimelinePage from './pages/TimelinePage'
 
 function App() {
+  const location = useLocation()
+  const isHome = location.pathname === '/'
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      <Navbar />
+      {!isHome ? <Navbar variant="sticky" /> : null}
 
       <Routes>
         <Route path="/" element={<HomeMap />} />

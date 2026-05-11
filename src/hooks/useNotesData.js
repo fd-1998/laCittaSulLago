@@ -25,7 +25,9 @@ export default function useNotesData() {
   }, [])
 
   useEffect(() => {
-    loadNotes()
+    void (async () => {
+      await loadNotes()
+    })()
   }, [loadNotes])
 
   return { groups, loading, error, reload: loadNotes }

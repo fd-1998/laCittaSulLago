@@ -25,7 +25,9 @@ export default function usePodcastsData() {
   }, [])
 
   useEffect(() => {
-    loadEpisodes()
+    void (async () => {
+      await loadEpisodes()
+    })()
   }, [loadEpisodes])
 
   return { episodes, loading, error, reload: loadEpisodes }

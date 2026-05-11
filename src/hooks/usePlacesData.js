@@ -69,7 +69,9 @@ export default function usePlacesData() {
   }, [setYears])
 
   useEffect(() => {
-    loadPlaces()
+    void (async () => {
+      await loadPlaces()
+    })()
   }, [loadPlaces])
 
   const primaryImages = useMemo(() => {

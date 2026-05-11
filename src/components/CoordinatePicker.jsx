@@ -17,7 +17,7 @@ function CoordinatePicker({ value, onChange }) {
     const map = L.map(mapContainerRef.current, {
       center: DEFAULT_CENTER,
       zoom: 11,
-      zoomControl: true,
+      zoomControl: false,
     })
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

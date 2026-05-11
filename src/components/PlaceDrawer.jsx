@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { CloseIcon, TimelineIcon } from './UiIcons'
 
 function PlaceDrawer({ place, onClose, onToggleVisited }) {
   const primaryImage = useMemo(() => {
@@ -31,11 +32,12 @@ function PlaceDrawer({ place, onClose, onToggleVisited }) {
           </p>
         </div>
         <button
-          className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-200"
+          aria-label="Close place details"
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-800 text-slate-200 transition hover:border-cyan-400/40 hover:text-white"
           type="button"
           onClick={onClose}
         >
-          Close
+          <CloseIcon />
         </button>
       </div>
 
@@ -88,11 +90,12 @@ function PlaceDrawer({ place, onClose, onToggleVisited }) {
 
       <div className="flex flex-wrap items-center gap-3">
         <button
-          className="inline-flex items-center justify-center rounded-full border border-cyan-400/30 px-4 py-2 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-400/10"
+          className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 px-4 py-2 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-400/10"
           type="button"
           onClick={onToggleVisited}
         >
-          {place.visited ? 'Mark as not visited' : 'Mark as visited'}
+          <TimelineIcon className="h-4 w-4" />
+          {place.visited ? 'Visited' : 'Not visited'}
         </button>
       </div>
     </aside>
