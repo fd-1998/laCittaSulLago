@@ -70,10 +70,11 @@ function HomeMap() {
   return (
     <main className="relative h-[100dvh] w-screen overflow-hidden bg-slate-950">
       <section
-        className="grid h-full w-full lg:transition-[grid-template-columns]"
-        style={{
-          gridTemplateColumns: isDesktopFiltersOpen ? '24rem minmax(0,1fr)' : '4.75rem minmax(0,1fr)',
-        }}
+        className={`grid h-full w-full grid-cols-1 lg:transition-[grid-template-columns] ${
+          isDesktopFiltersOpen
+            ? 'lg:grid-cols-[24rem_minmax(0,1fr)]'
+            : 'lg:grid-cols-[4.75rem_minmax(0,1fr)]'
+        }`}
       >
         <aside className="relative z-[2500] hidden h-full flex-col border-r border-slate-800/80 bg-slate-950/80 backdrop-blur lg:flex">
           <div className="sticky top-0 z-[2501] border-b border-slate-800/80 bg-slate-950/90 px-5 py-5">
@@ -214,7 +215,7 @@ function HomeMap() {
           role="presentation"
         />
         <div
-          className={`absolute bottom-0 left-0 right-0 max-h-[82vh] rounded-t-3xl border-t border-slate-800 bg-slate-950/95 p-5 shadow-2xl transition-transform ${
+          className={`absolute bottom-0 left-0 right-0 flex max-h-[82vh] flex-col overflow-hidden rounded-t-3xl border-t border-slate-800 bg-slate-950/95 p-5 shadow-2xl transition-transform ${
             isMobileFiltersOpen ? 'translate-y-0' : 'translate-y-full'
           }`}
         >
@@ -235,7 +236,7 @@ function HomeMap() {
             </button>
           </div>
 
-          <div className="space-y-4 overflow-auto pb-6">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain pb-6">
             <TimelineSlider periods={periods} />
 
             <label className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
