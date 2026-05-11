@@ -38,9 +38,51 @@ function Map({ places = [], onSelectPlace, activePlaceId }) {
     markerLayerRef.current.addTo(map)
     mapInstanceRef.current = map
 
+    // ensure Leaflet recalculates container size after initial render
+    setTimeout(() => {
+      try {
+        map.invalidateSize()
+      } catch {
+        // ignore
+      }
+    }, 0)
+
+    // react to container/viewport resizes so the map stays full-bleed
+    const debounceRef = { id: null }
+    const scheduleInvalidate = () => {
+      if (debounceRef.id) clearTimeout(debounceRef.id)
+      // wait a frame and a short timeout so layout settles (handles CSS transitions)
+      debounceRef.id = setTimeout(() => {
+        requestAnimationFrame(() => {
+          try {
+            map.invalidateSize()
+          } catch {
+            // ignore
+          }
+        })
+      }, 120)
+    }
+
+    const handleResize = scheduleInvalidate
+
+    window.addEventListener('resize', handleResize)
+    window.addEventListener('orientationchange', handleResize)
+    // also observe element size changes (useful in mobile chrome ui changes)
+    let ro = null
+    if (window.ResizeObserver && mapContainerRef.current) {
+      ro = new ResizeObserver(() => {
+        scheduleInvalidate()
+      })
+      ro.observe(mapContainerRef.current)
+    }
+
     return () => {
       map.remove()
       mapInstanceRef.current = null
+      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('orientationchange', handleResize)
+      if (ro) ro.disconnect()
+      if (debounceRef.id) clearTimeout(debounceRef.id)
     }
   }, [])
 
@@ -105,12 +147,20 @@ function Map({ places = [], onSelectPlace, activePlaceId }) {
       )
 
       if (bounds.isValid()) {
-        mapInstanceRef.current.fitBounds(bounds.pad(0.2), { animate: false })
+        // ensure container size is up-to-date before fitting bounds
+        try {
+          mapInstanceRef.current.invalidateSize()
+        } catch {
+          // ignore
+        }
+        // small delay so invalidateSize can take effect
+        setTimeout(() => mapInstanceRef.current.fitBounds(bounds.pad(0.2), { animate: false }), 50)
       }
     }
   }, [places, activePlaceId, onSelectPlace])
 
-  return <div ref={mapContainerRef} className="h-full min-h-[70vh] w-full rounded-3xl" />
+  // full-bleed map: keep the container in-flow so it tracks parent size reliably
+  return <div ref={mapContainerRef} className="h-full w-full min-h-[70vh]" />
 }
 
 export default Map

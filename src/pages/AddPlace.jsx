@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import CoordinatePicker from '../components/CoordinatePicker'
 import { supabase } from '../lib/supabase'
-import { createPlace, fetchHistoricalPeriods, insertPlaceImage } from '../services/places'
+import { createPlace, fetchHistoricalPeriods, insertPlaceImage, createHistoricalPeriod } from '../services/places'
 
 const initialForm = {
   title: '',
@@ -23,17 +23,50 @@ function AddPlace() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [periods, setPeriods] = useState([])
+  const [isAddingPeriod, setIsAddingPeriod] = useState(false)
+  const [newPeriod, setNewPeriod] = useState({ name: '', start_year: '', end_year: '', color: '#38bdf8' })
+
+  async function loadPeriods() {
+    const { data, error: supabaseError } = await fetchHistoricalPeriods()
+    if (!supabaseError) {
+      setPeriods(data ?? [])
+    }
+  }
 
   useEffect(() => {
-    async function loadPeriods() {
+    let mounted = true
+    async function init() {
       const { data, error: supabaseError } = await fetchHistoricalPeriods()
-      if (!supabaseError) {
+      if (mounted && !supabaseError) {
         setPeriods(data ?? [])
       }
     }
-
-    loadPeriods()
+    init()
+    return () => { mounted = false }
   }, [])
+
+  async function handleAddPeriod(event) {
+    event.preventDefault()
+    if (!newPeriod.name.trim() || !newPeriod.start_year || !newPeriod.end_year) return
+    
+    setSaving(true)
+    const { data, error: prError } = await createHistoricalPeriod({
+      name: newPeriod.name.trim(),
+      start_year: Number(newPeriod.start_year),
+      end_year: Number(newPeriod.end_year),
+      color: newPeriod.color
+    })
+    
+    if (!prError && data) {
+      await loadPeriods()
+      setForm((current) => ({ ...current, period_id: data.id }))
+      setIsAddingPeriod(false)
+      setNewPeriod({ name: '', start_year: '', end_year: '', color: '#38bdf8' })
+    } else {
+      setError(prError?.message || 'Error creating period')
+    }
+    setSaving(false)
+  }
 
   function updateField(event) {
     const { name, value } = event.target
@@ -243,23 +276,76 @@ function AddPlace() {
               />
             </label>
 
-            <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-200">Historical period</span>
-              <select
-                className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                name="period_id"
-                required
-                value={form.period_id}
-                onChange={updateField}
-              >
-                <option value="">Select a period</option>
-                {periods.map((period) => (
-                  <option key={period.id} value={period.id}>
-                    {period.name} ({period.start_year} → {period.end_year})
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="space-y-2 md:col-span-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-200">Historical period</span>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingPeriod(!isAddingPeriod)}
+                  className="text-xs font-semibold text-cyan-400 transition hover:text-cyan-300"
+                >
+                  {isAddingPeriod ? 'Cancel' : '+ Create new period'}
+                </button>
+              </div>
+              
+              {isAddingPeriod ? (
+                <div className="space-y-4 rounded-2xl border border-cyan-400/30 bg-cyan-950/20 p-4">
+                  <h3 className="text-sm font-semibold text-cyan-300">New Historical Period</h3>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="space-y-2 md:col-span-2">
+                      <span className="text-xs font-medium text-slate-300">Name</span>
+                      <input
+                        className="w-full rounded-xl border border-cyan-400/20 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-400/60"
+                        value={newPeriod.name}
+                        onChange={(e) => setNewPeriod({ ...newPeriod, name: e.target.value })}
+                        placeholder="e.g. Renaissance"
+                      />
+                    </label>
+                    <label className="space-y-2">
+                      <span className="text-xs font-medium text-slate-300">Start Year</span>
+                      <input
+                        type="number"
+                        className="w-full rounded-xl border border-cyan-400/20 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-400/60"
+                        value={newPeriod.start_year}
+                        onChange={(e) => setNewPeriod({ ...newPeriod, start_year: e.target.value })}
+                      />
+                    </label>
+                    <label className="space-y-2">
+                      <span className="text-xs font-medium text-slate-300">End Year</span>
+                      <input
+                        type="number"
+                        className="w-full rounded-xl border border-cyan-400/20 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-400/60"
+                        value={newPeriod.end_year}
+                        onChange={(e) => setNewPeriod({ ...newPeriod, end_year: e.target.value })}
+                      />
+                    </label>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddPeriod}
+                    disabled={saving}
+                    className="rounded-xl bg-cyan-400/20 px-4 py-2 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-400/30"
+                  >
+                    Save Period
+                  </button>
+                </div>
+              ) : (
+                <select
+                  className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
+                  name="period_id"
+                  required
+                  value={form.period_id}
+                  onChange={updateField}
+                >
+                  <option value="">Select a period</option>
+                  {periods.map((period) => (
+                    <option key={period.id} value={period.id}>
+                      {period.name} ({period.start_year} → {period.end_year})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
 
             <label className="space-y-2 md:col-span-2">
               <span className="text-sm font-medium text-slate-200">Coordinate picker</span>

@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Navbar from './components/Navbar'
+import MobileMenu from './components/MobileMenu'
 import AddPlace from './pages/AddPlace'
 import HomeMap from './pages/HomeMap'
 import NotesPage from './pages/NotesPage'
@@ -14,6 +15,9 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       {!isHome ? <Navbar variant="sticky" /> : null}
+
+      {/* mobile menu mounted globally so all pages share the same mobile menu component */}
+      <MobileMenu />
 
       <Routes>
         <Route path="/" element={<HomeMap />} />

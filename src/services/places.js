@@ -41,3 +41,7 @@ export async function insertPlaceImage(payload) {
 export async function fetchHistoricalPeriods() {
   return supabase.from('historical_periods').select('*').order('start_year', { ascending: true })
 }
+
+export async function createHistoricalPeriod(payload) {
+  return supabase.from('historical_periods').insert([payload]).select('*').single()
+}
