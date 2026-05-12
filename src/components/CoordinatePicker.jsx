@@ -44,7 +44,15 @@ function CoordinatePicker({ value, onChange }) {
   }, [onChange])
 
   useEffect(() => {
-    if (!mapRef.current || value?.latitude == null || value?.longitude == null) {
+    if (!mapRef.current) {
+      return
+    }
+
+    if (value?.latitude == null || value?.longitude == null) {
+      if (markerRef.current) {
+        markerRef.current.remove()
+        markerRef.current = null
+      }
       return
     }
 

@@ -5,7 +5,7 @@ import ImageUploader from '../components/ImageUploader'
 import { supabase } from '../lib/supabase'
 import { createPlace, fetchHistoricalPeriods, insertPlaceImage, createHistoricalPeriod } from '../services/places'
 
-  const initialForm = {
+const initialForm = {
   title: '',
   short_description: '',
   long_description: '',
@@ -18,6 +18,19 @@ import { createPlace, fetchHistoricalPeriods, insertPlaceImage, createHistorical
 }
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024
+
+function resolvePeriodId(value) {
+  if (value == null || value === '') {
+    return null
+  }
+
+  const numericValue = Number(value)
+  if (!Number.isNaN(numericValue)) {
+    return numericValue
+  }
+
+  return value
+}
 
 function createPreviewItem(file, isPrimary = false) {
   return {
@@ -38,7 +51,12 @@ function AddPlace() {
   const [periods, setPeriods] = useState([])
   const [isAddingPeriod, setIsAddingPeriod] = useState(false)
   const [newPeriod, setNewPeriod] = useState({ name: '', start_year: '', end_year: '', color: '#38bdf8' })
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [searchError, setSearchError] = useState('')
+  const [isSearching, setIsSearching] = useState(false)
   const imagesRef = useRef([])
+  const searchAbortRef = useRef(null)
 
   const primaryImage = useMemo(
     () => images.find((image) => image.isPrimary) ?? images[0] ?? null,
@@ -59,6 +77,12 @@ function AddPlace() {
   useEffect(() => {
     return () => {
       imagesRef.current.forEach((image) => URL.revokeObjectURL(image.previewUrl))
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      searchAbortRef.current?.abort()
     }
   }, [])
 
@@ -183,6 +207,82 @@ function AddPlace() {
     }))
   }, [])
 
+  async function handleSearch(event) {
+    event?.preventDefault()
+    const query = searchQuery.trim()
+    if (!query) {
+      setSearchError('Inserisci un luogo da cercare.')
+      setSearchResults([])
+      return
+    }
+
+    if (searchAbortRef.current) {
+      searchAbortRef.current.abort()
+    }
+
+    const controller = new AbortController()
+    searchAbortRef.current = controller
+    setIsSearching(true)
+    setSearchError('')
+
+    try {
+      const params = new URLSearchParams({
+        q: query,
+        format: 'jsonv2',
+        addressdetails: '1',
+        limit: '6',
+      })
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+        signal: controller.signal,
+        headers: {
+          Accept: 'application/json',
+          'Accept-Language': 'it',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error('Risposta non valida da OpenStreetMap.')
+      }
+
+      const results = await response.json()
+      if (!Array.isArray(results) || results.length === 0) {
+        setSearchResults([])
+        setSearchError('Nessun risultato trovato.')
+        return
+      }
+
+      setSearchResults(results)
+    } catch (err) {
+      if (err?.name !== 'AbortError') {
+        setSearchError('Errore durante la ricerca. Riprova più tardi.')
+      }
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  function handleSearchKeyDown(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      handleSearch(event)
+    }
+  }
+
+  function handleSelectSearchResult(result) {
+    const latitude = Number(result?.lat)
+    const longitude = Number(result?.lon)
+
+    if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+      setSearchError('Coordinate non valide dal risultato selezionato.')
+      return
+    }
+
+    updateCoordinates({ latitude, longitude })
+    setSearchQuery(result?.display_name ?? searchQuery)
+    setSearchResults([])
+    setSearchError('')
+  }
+
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
@@ -191,6 +291,7 @@ function AddPlace() {
     const longitude = Number(form.longitude)
     const startYear = Number(form.start_year)
     const endYear = Number(form.end_year)
+    const resolvedPeriodId = resolvePeriodId(form.period_id)
 
     if (!form.title.trim() || !form.short_description.trim() || !form.long_description.trim()) {
       setError('Compila il titolo, la descrizione breve e la descrizione estesa.')
@@ -199,6 +300,11 @@ function AddPlace() {
 
     if (!form.period_id) {
       setError('Seleziona un periodo storico.')
+      return
+    }
+
+    if (resolvedPeriodId == null) {
+      setError('Il periodo selezionato non è valido.')
       return
     }
 
@@ -237,7 +343,7 @@ function AddPlace() {
       longitude,
       start_year: startYear,
       end_year: endYear,
-      period_id: Number(form.period_id),
+      period_id: resolvedPeriodId,
       visited: form.visited,
     })
 
@@ -250,16 +356,26 @@ function AddPlace() {
     if (data?.id && images.length) {
       const uploadResults = await Promise.all(
         images.map(async (image, index) => {
-          const filePath = `${data.id}-${Date.now()}-${index}-${image.file.name}`
-          const { error: uploadError } = await supabase.storage
+          const safeFileName = image.file.name.replace(/[^a-z0-9._-]/gi, '_')
+          const filePath = `public/${data.id}/${Date.now()}-${index}-${safeFileName}`
+          const { data: uploadData, error: uploadError } = await supabase.storage
             .from('places')
-            .upload(filePath, image.file, { upsert: true })
+            .upload(filePath, image.file, {
+              upsert: false,
+              cacheControl: '3600',
+              contentType: image.file.type,
+            })
 
           if (uploadError) {
             return { status: 'rejected', error: uploadError }
           }
 
-          const { data: publicData } = supabase.storage.from('places').getPublicUrl(filePath)
+          const publicPath = uploadData?.path ?? filePath
+          const { data: publicData } = supabase.storage.from('places').getPublicUrl(publicPath)
+          if (!publicData?.publicUrl) {
+            return { status: 'rejected', error: new Error('URL pubblico non disponibile') }
+          }
+
           return {
             status: 'fulfilled',
             payload: {
@@ -277,7 +393,12 @@ function AddPlace() {
       const failedUploads = uploadResults.filter((result) => result.status === 'rejected')
 
       if (successfulImages.length) {
-        await insertPlaceImage(successfulImages.map((result) => result.payload))
+        const { error: insertError } = await insertPlaceImage(successfulImages.map((result) => result.payload))
+        if (insertError) {
+          setIsSubmitting(false)
+          setError('Luogo salvato, ma non è stato possibile collegare le immagini al luogo.')
+          return
+        }
       }
 
       if (failedUploads.length) {
@@ -343,6 +464,54 @@ function AddPlace() {
                 value={form.long_description}
                 onChange={updateField}
               />
+            </label>
+
+            <label className="space-y-2 md:col-span-2">
+              <span className="text-sm font-medium text-slate-200">Cerca luogo (OpenStreetMap)</span>
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  className="flex-1 rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="Es. Castello di Vezio, Bellagio, Lago di Como"
+                />
+                <button
+                  type="button"
+                  onClick={handleSearch}
+                  disabled={isSearching}
+                  className="rounded-full bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSearching ? 'Ricerca…' : 'Cerca'}
+                </button>
+              </div>
+              {searchError ? (
+                <p className="text-xs text-rose-300">{searchError}</p>
+              ) : null}
+              {searchResults.length ? (
+                <div className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/70 p-3">
+                  {searchResults.map((result) => {
+                    const latValue = Number(result.lat)
+                    const lonValue = Number(result.lon)
+                    const latLabel = Number.isFinite(latValue) ? latValue.toFixed(6) : '—'
+                    const lonLabel = Number.isFinite(lonValue) ? lonValue.toFixed(6) : '—'
+
+                    return (
+                      <button
+                        key={result.place_id}
+                        type="button"
+                        onClick={() => handleSelectSearchResult(result)}
+                        className="flex w-full flex-col gap-1 rounded-xl border border-transparent px-3 py-2 text-left text-sm text-slate-200 transition hover:border-cyan-400/40 hover:bg-slate-900/70"
+                      >
+                        <span className="font-semibold">{result.display_name}</span>
+                        <span className="text-xs text-slate-400">
+                          {latLabel}, {lonLabel}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : null}
             </label>
 
             <label className="space-y-2">
