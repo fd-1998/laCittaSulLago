@@ -18,7 +18,7 @@ export default function usePodcastsData() {
 
       setEpisodes(data ?? [])
     } catch (loadError) {
-      setError(loadError.message || 'Unable to load podcast episodes.')
+      setError(loadError.message || 'Impossibile caricare gli episodi podcast.')
     } finally {
       setLoading(false)
     }

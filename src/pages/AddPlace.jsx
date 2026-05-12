@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import CoordinatePicker from '../components/CoordinatePicker'
+import ImageUploader from '../components/ImageUploader'
 import { supabase } from '../lib/supabase'
 import { createPlace, fetchHistoricalPeriods, insertPlaceImage, createHistoricalPeriod } from '../services/places'
 
-const initialForm = {
+  const initialForm = {
   title: '',
   short_description: '',
   long_description: '',
@@ -14,24 +15,52 @@ const initialForm = {
   end_year: '',
   period_id: '',
   visited: false,
-  image: null,
+}
+
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024
+
+function createPreviewItem(file, isPrimary = false) {
+  return {
+    id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    file,
+    previewUrl: URL.createObjectURL(file),
+    isPrimary,
+  }
 }
 
 function AddPlace() {
   const navigate = useNavigate()
   const [form, setForm] = useState(initialForm)
-  const [saving, setSaving] = useState(false)
+  const [images, setImages] = useState([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSavingPeriod, setIsSavingPeriod] = useState(false)
   const [error, setError] = useState('')
   const [periods, setPeriods] = useState([])
   const [isAddingPeriod, setIsAddingPeriod] = useState(false)
   const [newPeriod, setNewPeriod] = useState({ name: '', start_year: '', end_year: '', color: '#38bdf8' })
+  const imagesRef = useRef([])
 
-  async function loadPeriods() {
+  const primaryImage = useMemo(
+    () => images.find((image) => image.isPrimary) ?? images[0] ?? null,
+    [images]
+  )
+
+  const loadPeriods = useCallback(async () => {
     const { data, error: supabaseError } = await fetchHistoricalPeriods()
     if (!supabaseError) {
       setPeriods(data ?? [])
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    imagesRef.current = images
+  }, [images])
+
+  useEffect(() => {
+    return () => {
+      imagesRef.current.forEach((image) => URL.revokeObjectURL(image.previewUrl))
+    }
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -49,7 +78,7 @@ function AddPlace() {
     event.preventDefault()
     if (!newPeriod.name.trim() || !newPeriod.start_year || !newPeriod.end_year) return
     
-    setSaving(true)
+    setIsSavingPeriod(true)
     const { data, error: prError } = await createHistoricalPeriod({
       name: newPeriod.name.trim(),
       start_year: Number(newPeriod.start_year),
@@ -63,9 +92,9 @@ function AddPlace() {
       setIsAddingPeriod(false)
       setNewPeriod({ name: '', start_year: '', end_year: '', color: '#38bdf8' })
     } else {
-      setError(prError?.message || 'Error creating period')
+      setError(prError?.message || 'Errore durante la creazione del periodo')
     }
-    setSaving(false)
+    setIsSavingPeriod(false)
   }
 
   function updateField(event) {
@@ -78,18 +107,81 @@ function AddPlace() {
     setForm((current) => ({ ...current, [name]: checked }))
   }
 
-  function updateImage(event) {
-    const file = event.target.files?.[0] ?? null
-    setForm((current) => ({ ...current, image: file }))
+  function validateAndAddFiles(fileList) {
+    const incoming = Array.from(fileList ?? [])
+    if (!incoming.length) {
+      return
+    }
+
+    const accepted = []
+    const rejected = []
+
+    for (const file of incoming) {
+      if (!file.type.startsWith('image/')) {
+        rejected.push(`${file.name} non è un'immagine`)
+        continue
+      }
+
+      if (file.size > MAX_IMAGE_SIZE) {
+        rejected.push(`${file.name} è più grande di 10 MB`)
+        continue
+      }
+
+      accepted.push(file)
+    }
+
+    if (rejected.length) {
+      setError(rejected.join(' · '))
+    } else {
+      setError('')
+    }
+
+    if (!accepted.length) {
+      return
+    }
+
+    setImages((current) => {
+      const nextItems = accepted.map((file, index) => createPreviewItem(file, current.length === 0 && index === 0))
+
+      if (!current.some((image) => image.isPrimary) && nextItems.length) {
+        nextItems[0] = { ...nextItems[0], isPrimary: true }
+      }
+
+      return [...current, ...nextItems]
+    })
   }
 
-  function updateCoordinates({ latitude, longitude }) {
+  function removeImage(imageId) {
+    setImages((current) => {
+      const removed = current.find((image) => image.id === imageId)
+      if (removed) {
+        URL.revokeObjectURL(removed.previewUrl)
+      }
+
+      const next = current.filter((image) => image.id !== imageId)
+      if (!next.length) {
+        return []
+      }
+
+      if (!next.some((image) => image.isPrimary)) {
+        next[0] = { ...next[0], isPrimary: true }
+      }
+
+      return next
+    })
+  }
+
+  function markPrimaryImage(imageId) {
+    setImages((current) => current.map((image) => ({ ...image, isPrimary: image.id === imageId })))
+  }
+
+  const updateCoordinates = useCallback(({ latitude, longitude }) => {
     setForm((current) => ({
       ...current,
       latitude: latitude.toFixed(6),
       longitude: longitude.toFixed(6),
     }))
-  }
+  }, [])
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -101,12 +193,12 @@ function AddPlace() {
     const endYear = Number(form.end_year)
 
     if (!form.title.trim() || !form.short_description.trim() || !form.long_description.trim()) {
-      setError('Please fill in the title, short description, and long description.')
+      setError('Compila il titolo, la descrizione breve e la descrizione estesa.')
       return
     }
 
     if (!form.period_id) {
-      setError('Please select a historical period.')
+      setError('Seleziona un periodo storico.')
       return
     }
 
@@ -116,21 +208,26 @@ function AddPlace() {
       Number.isNaN(startYear) ||
       Number.isNaN(endYear)
     ) {
-      setError('Latitude, longitude, start year, and end year must be valid numbers.')
+      setError('Latitudine, longitudine, anno inizio e anno fine devono essere numeri validi.')
       return
     }
 
     if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-      setError('Latitude must be between -90 and 90, and longitude between -180 and 180.')
+      setError('La latitudine deve essere tra -90 e 90 e la longitudine tra -180 e 180.')
       return
     }
 
     if (startYear > endYear) {
-      setError('Start year must be less than or equal to end year.')
+      setError("L'anno di inizio deve essere minore o uguale all'anno di fine.")
       return
     }
 
-    setSaving(true)
+    if (images.some((image) => image.file.size > MAX_IMAGE_SIZE)) {
+      setError('Una o più immagini sono troppo grandi. Ogni file deve essere massimo 10 MB.')
+      return
+    }
+
+    setIsSubmitting(true)
 
     const { data, error: supabaseError } = await createPlace({
       title: form.title.trim(),
@@ -145,30 +242,52 @@ function AddPlace() {
     })
 
     if (supabaseError) {
-      setSaving(false)
+      setIsSubmitting(false)
       setError(supabaseError.message)
       return
     }
 
-    if (form.image && data?.id) {
-      const filePath = `places/${data.id}/${Date.now()}-${form.image.name}`
-      const { error: uploadError } = await supabase.storage
-        .from('place-images')
-        .upload(filePath, form.image, { upsert: true })
+    if (data?.id && images.length) {
+      const uploadResults = await Promise.all(
+        images.map(async (image, index) => {
+          const filePath = `${data.id}-${Date.now()}-${index}-${image.file.name}`
+          const { error: uploadError } = await supabase.storage
+            .from('places')
+            .upload(filePath, image.file, { upsert: true })
 
-      if (!uploadError) {
-        const { data: publicData } = supabase.storage.from('place-images').getPublicUrl(filePath)
-        await insertPlaceImage({
-          place_id: data.id,
-          image_url: publicData?.publicUrl,
-          thumbnail_url: publicData?.publicUrl,
-          caption: form.title.trim(),
-          is_primary: true,
+          if (uploadError) {
+            return { status: 'rejected', error: uploadError }
+          }
+
+          const { data: publicData } = supabase.storage.from('places').getPublicUrl(filePath)
+          return {
+            status: 'fulfilled',
+            payload: {
+              place_id: data.id,
+              image_url: publicData?.publicUrl,
+              thumbnail_url: publicData?.publicUrl,
+              caption: image.file.name,
+              is_primary: image.isPrimary,
+            },
+          }
         })
+      )
+
+      const successfulImages = uploadResults.filter((result) => result.status === 'fulfilled' && result.payload)
+      const failedUploads = uploadResults.filter((result) => result.status === 'rejected')
+
+      if (successfulImages.length) {
+        await insertPlaceImage(successfulImages.map((result) => result.payload))
+      }
+
+      if (failedUploads.length) {
+        setIsSubmitting(false)
+        setError(`Luogo salvato, ma ${failedUploads.length} caricamento${failedUploads.length > 1 ? 'i' : ''} immagine non è riuscito.`)
+        return
       }
     }
 
-    setSaving(false)
+    setIsSubmitting(false)
     navigate('/')
   }
 
@@ -176,25 +295,25 @@ function AddPlace() {
     <main className="mx-auto w-full max-w-3xl px-4 py-4 sm:px-6 lg:px-8 lg:py-8">
       <section className="panel">
         <div className="panel-header">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-300/80">
-            Add location
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">Add a place</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-300">
-            Save a new historical location to the <code className="rounded bg-slate-800 px-2 py-0.5">places</code> table.
-          </p>
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-300/80">
+                Aggiungi luogo
+              </p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">Aggiungi un luogo</h1>
+              <p className="mt-3 text-sm leading-6 text-slate-300">
+                Salva un nuovo luogo storico nella tabella <code className="rounded bg-slate-800 px-2 py-0.5">places</code>.
+              </p>
         </div>
 
         <form className="panel-body space-y-5" onSubmit={handleSubmit}>
           {error ? (
-            <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200">
+            <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200" role="alert">
               {error}
             </div>
           ) : null}
 
           <div className="grid gap-4 md:grid-cols-2">
             <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-200">Title</span>
+              <span className="text-sm font-medium text-slate-200">Titolo</span>
               <input
                 className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
                 name="title"
@@ -205,7 +324,7 @@ function AddPlace() {
             </label>
 
             <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-200">Short description</span>
+              <span className="text-sm font-medium text-slate-200">Descrizione breve</span>
               <textarea
                 className="min-h-36 w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
                 name="short_description"
@@ -216,7 +335,7 @@ function AddPlace() {
             </label>
 
             <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-200">Long description</span>
+              <span className="text-sm font-medium text-slate-200">Descrizione estesa</span>
               <textarea
                 className="min-h-40 w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
                 name="long_description"
@@ -227,7 +346,7 @@ function AddPlace() {
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-200">Latitude</span>
+              <span className="text-sm font-medium text-slate-200">Latitudine</span>
               <input
                 className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
                 name="latitude"
@@ -240,7 +359,7 @@ function AddPlace() {
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-200">Longitude</span>
+              <span className="text-sm font-medium text-slate-200">Longitudine</span>
               <input
                 className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
                 name="longitude"
@@ -253,7 +372,7 @@ function AddPlace() {
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-200">Start year</span>
+              <span className="text-sm font-medium text-slate-200">Anno inizio</span>
               <input
                 className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
                 name="start_year"
@@ -265,7 +384,7 @@ function AddPlace() {
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-200">End year</span>
+              <span className="text-sm font-medium text-slate-200">Anno fine</span>
               <input
                 className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
                 name="end_year"
@@ -277,32 +396,32 @@ function AddPlace() {
             </label>
 
             <div className="space-y-2 md:col-span-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-200">Historical period</span>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-medium text-slate-200">Periodo storico</span>
                 <button
                   type="button"
                   onClick={() => setIsAddingPeriod(!isAddingPeriod)}
                   className="text-xs font-semibold text-cyan-400 transition hover:text-cyan-300"
                 >
-                  {isAddingPeriod ? 'Cancel' : '+ Create new period'}
+                  {isAddingPeriod ? 'Annulla' : '+ Crea nuovo periodo'}
                 </button>
               </div>
               
               {isAddingPeriod ? (
                 <div className="space-y-4 rounded-2xl border border-cyan-400/30 bg-cyan-950/20 p-4">
-                  <h3 className="text-sm font-semibold text-cyan-300">New Historical Period</h3>
+                  <h3 className="text-sm font-semibold text-cyan-300">Nuovo periodo storico</h3>
                   <div className="grid gap-4 md:grid-cols-2">
                     <label className="space-y-2 md:col-span-2">
-                      <span className="text-xs font-medium text-slate-300">Name</span>
+                      <span className="text-xs font-medium text-slate-300">Nome</span>
                       <input
                         className="w-full rounded-xl border border-cyan-400/20 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-400/60"
                         value={newPeriod.name}
                         onChange={(e) => setNewPeriod({ ...newPeriod, name: e.target.value })}
-                        placeholder="e.g. Renaissance"
+                        placeholder="es. Rinascimento"
                       />
                     </label>
                     <label className="space-y-2">
-                      <span className="text-xs font-medium text-slate-300">Start Year</span>
+                      <span className="text-xs font-medium text-slate-300">Anno inizio</span>
                       <input
                         type="number"
                         className="w-full rounded-xl border border-cyan-400/20 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-400/60"
@@ -311,7 +430,7 @@ function AddPlace() {
                       />
                     </label>
                     <label className="space-y-2">
-                      <span className="text-xs font-medium text-slate-300">End Year</span>
+                      <span className="text-xs font-medium text-slate-300">Anno fine</span>
                       <input
                         type="number"
                         className="w-full rounded-xl border border-cyan-400/20 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-400/60"
@@ -323,10 +442,10 @@ function AddPlace() {
                   <button
                     type="button"
                     onClick={handleAddPeriod}
-                    disabled={saving}
+                    disabled={isSavingPeriod}
                     className="rounded-xl bg-cyan-400/20 px-4 py-2 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-400/30"
                   >
-                    Save Period
+                    {isSavingPeriod ? 'Salvataggio…' : 'Salva periodo'}
                   </button>
                 </div>
               ) : (
@@ -337,7 +456,7 @@ function AddPlace() {
                   value={form.period_id}
                   onChange={updateField}
                 >
-                  <option value="">Select a period</option>
+                  <option value="">Seleziona un periodo</option>
                   {periods.map((period) => (
                     <option key={period.id} value={period.id}>
                       {period.name} ({period.start_year} → {period.end_year})
@@ -348,7 +467,7 @@ function AddPlace() {
             </div>
 
             <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-200">Coordinate picker</span>
+              <span className="text-sm font-medium text-slate-200">Selettore coordinate</span>
               <CoordinatePicker
                 value={{
                   latitude: form.latitude ? Number(form.latitude) : null,
@@ -358,15 +477,20 @@ function AddPlace() {
               />
             </label>
 
-            <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-200">Primary image</span>
-              <input
-                className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none file:mr-4 file:rounded-full file:border-0 file:bg-cyan-400 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-950"
-                type="file"
-                accept="image/*"
-                onChange={updateImage}
+            <div className="md:col-span-2">
+              <ImageUploader
+                disabled={isSubmitting}
+                images={images}
+                onAddFiles={validateAndAddFiles}
+                onMarkPrimary={markPrimaryImage}
+                onRemoveImage={removeImage}
               />
-            </label>
+              {primaryImage ? (
+                <p className="mt-3 text-xs text-slate-400">
+                  Immagine principale: <span className="text-slate-200">{primaryImage.file.name}</span>
+                </p>
+              ) : null}
+            </div>
 
             <label className="flex items-center gap-3 md:col-span-2">
               <input
@@ -376,21 +500,21 @@ function AddPlace() {
                 type="checkbox"
                 onChange={updateCheckbox}
               />
-              <span className="text-sm text-slate-200">Mark as visited</span>
+              <span className="text-sm text-slate-200">Segna come visitato</span>
             </label>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button
+              <button
               className="inline-flex items-center justify-center rounded-full bg-cyan-400 px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={saving}
+              disabled={isSubmitting || isSavingPeriod}
               type="submit"
             >
-              {saving ? 'Saving…' : 'Save place'}
+              {isSubmitting ? 'Salvataggio…' : 'Salva luogo'}
             </button>
 
             <p className="text-sm text-slate-400">
-              Uses Supabase inserts and storage uploads on the frontend only.
+              Le immagini rimangono locali fino al salvataggio, poi vengono caricate nel bucket pubblico <code className="rounded bg-slate-800 px-1.5 py-0.5">places</code>.
             </p>
           </div>
         </form>

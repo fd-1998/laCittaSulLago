@@ -8,6 +8,11 @@ function CoordinatePicker({ value, onChange }) {
   const mapContainerRef = useRef(null)
   const mapRef = useRef(null)
   const markerRef = useRef(null)
+  const onChangeRef = useRef(onChange)
+
+  useEffect(() => {
+    onChangeRef.current = onChange
+  }, [onChange])
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) {
@@ -27,7 +32,7 @@ function CoordinatePicker({ value, onChange }) {
 
     map.on('click', (event) => {
       const { lat, lng } = event.latlng
-      onChange?.({ latitude: lat, longitude: lng })
+      onChangeRef.current?.({ latitude: lat, longitude: lng })
     })
 
     mapRef.current = map
@@ -45,11 +50,11 @@ function CoordinatePicker({ value, onChange }) {
 
     if (!markerRef.current) {
       markerRef.current = L.marker([value.latitude, value.longitude]).addTo(mapRef.current)
+      mapRef.current.setView([value.latitude, value.longitude], 13, { animate: true })
     } else {
       markerRef.current.setLatLng([value.latitude, value.longitude])
+      mapRef.current.panTo([value.latitude, value.longitude], { animate: true })
     }
-
-    mapRef.current.setView([value.latitude, value.longitude], 13, { animate: true })
   }, [value])
 
   return <div ref={mapContainerRef} className="h-56 w-full rounded-2xl" />

@@ -18,6 +18,7 @@ import {
 import { isPlaceVisibleAtYear, useTimeline } from '../context/TimelineContext'
 import usePlacesData from '../hooks/usePlacesData'
 import { updatePlaceVisited } from '../services/places'
+import SiteLogo from '../assets/logo.png'
 
 
 function HomeMap() {
@@ -79,21 +80,20 @@ function HomeMap() {
         <aside className="relative z-[2500] hidden h-full flex-col border-r border-slate-800/80 bg-slate-950/80 backdrop-blur lg:flex">
           <div className="sticky top-0 z-[2501] border-b border-slate-800/80 bg-slate-950/90 px-5 py-5">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300/80">
-              La Città sul Lago
+              Atlante storico di Lecco
             </p>
-            <h1 className="mt-2 text-2xl font-semibold text-white">Lecco historical atlas</h1>
-            {loading ? <p className="mt-2 text-xs text-slate-400">Loading archive…</p> : null}
+            <h1 className="mt-2 text-2xl font-semibold text-white">La Città sul Lago</h1>
+            {loading ? <p className="mt-2 text-xs text-slate-400">Caricamento archivio…</p> : null}
             {error ? <p className="mt-2 text-xs text-rose-300">{error}</p> : null}
           </div>
 
           <div className="relative flex-1 overflow-hidden px-5 py-5">
             <button
-              aria-label={isDesktopFiltersOpen ? 'Collapse filters' : 'Expand filters'}
+              aria-label={isDesktopFiltersOpen ? 'Riduci filtri' : 'Espandi filtri'}
               className="absolute -right-4 top-6 z-[2503] flex h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-950 text-cyan-300 shadow-xl transition hover:border-cyan-400/40"
               type="button"
               onClick={() => setIsDesktopFiltersOpen((value) => !value)}
             >
-              {isDesktopFiltersOpen ? <ChevronLeftIcon /> : <ChevronRightIcon />}
             </button>
 
             {isDesktopFiltersOpen ? (
@@ -104,8 +104,8 @@ function HomeMap() {
                       <FilterIcon />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-white">Filters</p>
-                      <p className="text-xs text-slate-400">Timeline + historical period</p>
+                      <p className="text-sm font-semibold text-white">Filtri</p>
+                      <p className="text-xs text-slate-400">Cronologia + periodo storico</p>
                     </div>
                   </div>
                 </div>
@@ -122,7 +122,7 @@ function HomeMap() {
                     value={selectedPeriodId}
                     onChange={(event) => setSelectedPeriodId(event.target.value)}
                   >
-                    <option value="all">All periods</option>
+                    <option value="all">Tutti i periodi</option>
                     {periods.map((period) => (
                       <option key={period.id} value={period.id}>
                         {period.name}
@@ -144,14 +144,18 @@ function HomeMap() {
         <section className="relative h-full min-w-0">
           {/* Mobile menu is now a shared component mounted in App */}
 
-          <div className="absolute right-4 top-4 z-[2500] max-w-[min(18rem,calc(100vw-6rem))] rounded-3xl border border-slate-800/80 bg-slate-950/70 px-4 py-3 shadow-2xl backdrop-blur lg:hidden text-right">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300/80">
-              La Città sul Lago
-            </p>
+          <div className="absolute flex flex-row items-center gap-3 right-4 top-4 z-[2500] max-w-[min(18rem,calc(100vw-6rem))] rounded-3xl border border-slate-800/80 bg-slate-950/70 px-4 py-3 shadow-2xl backdrop-blur lg:hidden text-right">
+            <div className="flex-shrink-0">
+              <img src={SiteLogo} alt="Logo" className="h-10 w-10 rounded-md object-cover" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300/80">La Città sul Lago</p>
+              <h2 className="mt-1 text-xs text-white">Atlante storico di Lecco</h2>
+            </div>
           </div>
 
           <button
-            aria-label="Open filters"
+            aria-label="Apri filtri"
             className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[2600] flex h-12 items-center gap-2 rounded-full border border-slate-800/80 bg-slate-950/85 px-6 text-cyan-300 shadow-2xl backdrop-blur transition hover:bg-slate-800/90 lg:hidden ${
               isMobileFiltersOpen ? 'pointer-events-none opacity-0' : 'opacity-100'
             }`}
@@ -159,16 +163,16 @@ function HomeMap() {
             onClick={() => setIsMobileFiltersOpen(true)}
           >
             <FilterIcon className="h-5 w-5" />
-            <span className="text-sm font-semibold tracking-wide">Filters</span>
+            <span className="text-sm font-semibold tracking-wide">Filtri</span>
           </button>
 
           <div className="absolute right-4 top-4 z-[2501] hidden items-center gap-2 rounded-full border border-slate-800/80 bg-slate-950/70 px-3 py-2 shadow-2xl backdrop-blur lg:flex">
             {[
-              ['/', 'Map', HomeIcon],
-              ['/timeline', 'Timeline', TimelineIcon],
-              ['/podcasts', 'Podcasts', PodcastsIcon],
-              ['/notes', 'Notes', NotesIcon],
-              ['/add-location', 'Add', AddIcon],
+              ['/', 'Mappa', HomeIcon],
+              ['/timeline', 'Cronologia', TimelineIcon],
+              ['/podcasts', 'Podcast', PodcastsIcon],
+              ['/notes', 'Note', NotesIcon],
+              ['/add-location', 'Aggiungi', AddIcon],
             ].map(([to, label, Icon]) => (
               <Link
                 key={to}
@@ -219,15 +223,15 @@ function HomeMap() {
             isMobileFiltersOpen ? 'translate-y-0' : 'translate-y-full'
           }`}
         >
-          <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <FilterIcon className="h-4 w-4 text-cyan-300" />
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300/80">
-                Filters
+                Filtri
               </p>
             </div>
             <button
-              aria-label="Close filters"
+              aria-label="Chiudi filtri"
               className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-800 text-slate-200 transition hover:border-cyan-400/40 hover:text-white"
               type="button"
               onClick={() => setIsMobileFiltersOpen(false)}

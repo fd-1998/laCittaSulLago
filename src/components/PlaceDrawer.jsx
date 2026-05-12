@@ -24,7 +24,7 @@ function PlaceDrawer({ place, onClose, onToggleVisited }) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/70">
-            {period?.name ?? 'Historical place'}
+            {period?.name ?? 'Luogo storico'}
           </p>
           <h2 className="mt-2 text-2xl font-semibold text-white">{place.title}</h2>
           <p className="mt-2 text-xs text-slate-400">
@@ -32,7 +32,7 @@ function PlaceDrawer({ place, onClose, onToggleVisited }) {
           </p>
         </div>
         <button
-          aria-label="Close place details"
+          aria-label="Chiudi dettagli luogo"
           className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-800 text-slate-200 transition hover:border-cyan-400/40 hover:text-white"
           type="button"
           onClick={onClose}
@@ -53,14 +53,14 @@ function PlaceDrawer({ place, onClose, onToggleVisited }) {
 
       <div className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-sm">
         <div>
-          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Coordinates</p>
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Coordinate</p>
           <p className="mt-1 text-slate-200">
             {place.latitude}, {place.longitude}
           </p>
         </div>
         {tags.length ? (
           <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Tags</p>
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Tag</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {tags.map((tag) => (
                 <span
@@ -75,7 +75,7 @@ function PlaceDrawer({ place, onClose, onToggleVisited }) {
         ) : null}
         {podcasts.length ? (
           <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Podcasts</p>
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Podcast</p>
             <ul className="mt-2 space-y-2 text-xs text-slate-300">
               {podcasts.map((episode) => (
                 <li key={episode.id} className="rounded-2xl border border-slate-800 bg-slate-950/60 p-3">
@@ -95,7 +95,7 @@ function PlaceDrawer({ place, onClose, onToggleVisited }) {
           onClick={onToggleVisited}
         >
           <TimelineIcon className="h-4 w-4" />
-          {place.visited ? 'Visited' : 'Not visited'}
+          {place.visited ? 'Visitato' : 'Non visitato'}
         </button>
       </div>
     </aside>

@@ -11,11 +11,11 @@ import {
 } from './UiIcons'
 
 const mobileLinks = [
-  { to: '/', label: 'Map', icon: HomeIcon },
-  { to: '/timeline', label: 'Timeline', icon: TimelineIcon },
-  { to: '/podcasts', label: 'Podcasts', icon: PodcastsIcon },
-  { to: '/notes', label: 'Notes', icon: NotesIcon },
-  { to: '/add-location', label: 'Add', icon: AddIcon },
+  { to: '/', label: 'Mappa', icon: HomeIcon },
+  { to: '/timeline', label: 'Cronologia', icon: TimelineIcon },
+  { to: '/podcasts', label: 'Podcast', icon: PodcastsIcon },
+  { to: '/notes', label: 'Note', icon: NotesIcon },
+  { to: '/add-location', label: 'Aggiungi', icon: AddIcon },
 ]
 
 export default function MobileMenu() {
@@ -25,7 +25,7 @@ export default function MobileMenu() {
     <>
       <div className="fixed left-4 top-4 z-[99997] flex items-center gap-2 lg:hidden">
         <button
-          aria-label={isOpen ? 'Close menu' : 'Open menu'}
+          aria-label={isOpen ? 'Chiudi menu' : 'Apri menu'}
           className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-800/80 bg-slate-950/80 text-slate-100 shadow-2xl backdrop-blur transition hover:bg-slate-800/90"
           type="button"
           onClick={() => setIsOpen((v) => !v)}

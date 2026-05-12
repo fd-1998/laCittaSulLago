@@ -25,7 +25,7 @@ function MobilePanel({ isOpen, title, children, onClose }) {
             type="button"
             onClick={onClose}
           >
-            Close
+            Chiudi
           </button>
         </div>
         <div className="overflow-auto pb-6">{children}</div>

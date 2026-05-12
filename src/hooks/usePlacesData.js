@@ -62,7 +62,7 @@ export default function usePlacesData() {
         setYears(years)
       }
     } catch (loadError) {
-      setError(loadError.message || 'Unable to load places data.')
+      setError(loadError.message || 'Impossibile caricare i dati dei luoghi.')
     } finally {
       setLoading(false)
     }

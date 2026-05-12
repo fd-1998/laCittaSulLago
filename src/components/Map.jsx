@@ -112,8 +112,8 @@ function Map({ places = [], onSelectPlace, activePlaceId }) {
               ? `<img src="${displayImage}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 12px; margin-bottom: 8px;" />`
               : ''
           }
-          <h3 style="margin: 0 0 4px; font-size: 15px;">${place.title ?? 'Untitled place'}</h3>
-          <p style="margin: 0 0 6px; font-size: 12px; color: #94a3b8;">${period?.name ?? 'Historical location'}</p>
+          <h3 style="margin: 0 0 4px; font-size: 15px;">${place.title ?? 'Luogo senza titolo'}</h3>
+          <p style="margin: 0 0 6px; font-size: 12px; color: #94a3b8;">${period?.name ?? 'Luogo storico'}</p>
           <p style="margin: 0; font-size: 12px; line-height: 1.45; color: #cbd5f5;">${
             (place.short_description ?? '').slice(0, 120)
           }</p>

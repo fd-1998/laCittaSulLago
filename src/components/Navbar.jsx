@@ -23,9 +23,9 @@ function Navbar({ variant = 'sticky' }) {
           </div>
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-cyan-300/80">
-              Lecco Story Map
+              La Città sul Lago
             </p>
-            <p className="text-xs text-slate-400">Historical and cultural storytelling</p>
+            <p className="text-xs text-slate-400">Racconti storici e culturali</p>
           </div>
         </NavLink>
 
@@ -36,7 +36,7 @@ function Navbar({ variant = 'sticky' }) {
               `${linkBase} ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
             }
           >
-            Map
+            Mappa
           </NavLink>
           <NavLink
             to="/timeline"
@@ -44,7 +44,7 @@ function Navbar({ variant = 'sticky' }) {
               `${linkBase} ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
             }
           >
-            Timeline
+            Cronologia
           </NavLink>
           <NavLink
             to="/podcasts"
@@ -52,7 +52,7 @@ function Navbar({ variant = 'sticky' }) {
               `${linkBase} ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
             }
           >
-            Podcasts
+            Podcast
           </NavLink>
           <NavLink
             to="/notes"
@@ -60,7 +60,7 @@ function Navbar({ variant = 'sticky' }) {
               `${linkBase} ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
             }
           >
-            Notes
+            Note
           </NavLink>
           <NavLink
             to="/add-location"
@@ -68,7 +68,7 @@ function Navbar({ variant = 'sticky' }) {
               `${linkBase} ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
             }
           >
-            Add Place
+            Aggiungi luogo
           </NavLink>
 
           {timelineEnabled ? (

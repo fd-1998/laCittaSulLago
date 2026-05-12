@@ -10,13 +10,13 @@ function NotesPage() {
       <section className="panel">
         <div className="panel-header">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-300/80">
-            Research archive
+            Archivio di ricerca
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">
-            Notes, sources, and chronicles
+            Note, fonti e cronache
           </h1>
           <p className="mt-3 text-sm leading-6 text-slate-300">
-            Dive into curated notes, grouped by theme, and browse entries chronologically.
+            Esplora note curate, raggruppate per tema, e sfoglia le voci in ordine cronologico.
           </p>
         </div>
 
@@ -51,11 +51,11 @@ function NotesPage() {
                     onClick={() => setOpenGroupId(isOpen ? null : group.id)}
                   >
                     <div>
-                      <p className="text-xs uppercase tracking-[0.18em] text-cyan-300/70">Group</p>
+                              <p className="text-xs uppercase tracking-[0.18em] text-cyan-300/70">Gruppo</p>
                       <h2 className="mt-1 text-lg font-semibold text-white">{group.name}</h2>
-                      <p className="mt-1 text-xs text-slate-400">{notes.length} notes</p>
+                      <p className="mt-1 text-xs text-slate-400">{notes.length} note</p>
                     </div>
-                    <span className="text-xs text-slate-400">{isOpen ? 'Collapse' : 'Expand'}</span>
+                    <span className="text-xs text-slate-400">{isOpen ? 'Comprimi' : 'Espandi'}</span>
                   </button>
 
                   {isOpen ? (
@@ -66,7 +66,7 @@ function NotesPage() {
                           className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4"
                         >
                           <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                            {note.date_reference || 'Undated'}
+                            {note.date_reference || 'Senza data'}
                           </p>
                           <h3 className="mt-2 text-lg font-semibold text-white">{note.title}</h3>
                           {note.subtitle ? (
@@ -78,8 +78,8 @@ function NotesPage() {
 
                       {notes.length === 0 ? (
                         <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/60 p-4 text-sm text-slate-400">
-                          No notes in this group yet.
-                        </div>
+                            Nessuna nota in questo gruppo.
+                          </div>
                       ) : null}
                     </div>
                   ) : null}
@@ -89,7 +89,7 @@ function NotesPage() {
 
             {!loading && groups.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/60 p-5 text-sm text-slate-400">
-                No note groups are available yet.
+                Nessun gruppo di note disponibile.
               </div>
             ) : null}
           </div>

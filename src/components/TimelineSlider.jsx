@@ -30,13 +30,13 @@ function TimelineSlider({ periods = [] }) {
         type="button"
         onClick={() => setTimelineEnabled(true)}
       >
-        <span className="flex items-center gap-3">
+          <span className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-400/10 text-cyan-300">
             <TimelineIcon />
           </span>
           <span>
-            <span className="block text-sm font-semibold text-white">Timeline</span>
-            <span className="block text-xs text-slate-400">Tap to enable</span>
+            <span className="block text-sm font-semibold text-white">Cronologia</span>
+            <span className="block text-xs text-slate-400">Tocca per attivare</span>
           </span>
         </span>
         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-cyan-400 text-slate-950">
@@ -53,13 +53,13 @@ function TimelineSlider({ periods = [] }) {
         type="button"
         onClick={() => setTimelineEnabled(false)}
       >
-        <span className="flex items-center gap-3">
+          <span className="flex items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-300">
             <TimelineIcon />
           </span>
           <span>
             <span className="block text-sm font-semibold text-white">{formatTimelineYear(selectedYear)}</span>
-            <span className="block text-xs text-slate-400">{label || 'Historical period'}</span>
+            <span className="block text-xs text-slate-400">{label || 'Periodo storico'}</span>
           </span>
         </span>
         <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 text-slate-300">
@@ -68,7 +68,7 @@ function TimelineSlider({ periods = [] }) {
       </button>
 
       <input
-        aria-label="Timeline year"
+        aria-label="Anno cronologia"
         className="timeline-slider h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-700 accent-cyan-400"
         min={0}
         max={Math.max(years.length - 1, 0)}

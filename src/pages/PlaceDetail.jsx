@@ -51,25 +51,25 @@ function PlaceDetail() {
       <section className="panel">
         <div className="panel-header flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-300/80">
-              Place detail
-            </p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">
-              Single location view
-            </h1>
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-300/80">
+                Dettagli luogo
+              </p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">
+                Dettaglio del luogo
+              </h1>
           </div>
           <Link
             to="/"
             className="rounded-full border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
           >
-            Back to map
+              Torna alla mappa
           </Link>
         </div>
 
         <div className="panel-body space-y-5">
           {loading ? (
             <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-300">
-              Loading place…
+                Caricamento luogo…
             </div>
           ) : null}
 
@@ -84,7 +84,7 @@ function PlaceDetail() {
               <div className="space-y-4">
                 <div>
                   <p className="text-xs uppercase tracking-[0.18em] text-cyan-300/70">
-                    {place.historical_periods?.name || 'Historical place'}
+                      {place.historical_periods?.name || 'Luogo storico'}
                   </p>
                   <h2 className="mt-2 text-3xl font-semibold text-white">{place.title}</h2>
                 </div>
@@ -103,27 +103,27 @@ function PlaceDetail() {
                   to="/"
                   className="inline-flex items-center justify-center rounded-full border border-cyan-400/30 px-4 py-2 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-400/10"
                 >
-                  Open in map
+                  Apri nella mappa
                 </Link>
               </div>
 
               <aside className="space-y-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Coordinates</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Coordinate</p>
                   <p className="mt-1 text-sm font-medium text-slate-200">
                     {place.latitude}, {place.longitude}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Timeline</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Cronologia</p>
                   <p className="mt-1 text-sm font-medium text-slate-200">
                     {place.start_year} → {place.end_year}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Period label</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Periodo</p>
                   <p className="mt-1 text-sm font-medium text-slate-200">
                     {place.historical_periods?.name}
                   </p>

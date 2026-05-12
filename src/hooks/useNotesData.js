@@ -18,7 +18,7 @@ export default function useNotesData() {
 
       setGroups(data ?? [])
     } catch (loadError) {
-      setError(loadError.message || 'Unable to load notes.')
+      setError(loadError.message || 'Impossibile caricare le note.')
     } finally {
       setLoading(false)
     }

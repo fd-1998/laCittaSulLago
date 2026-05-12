@@ -8,14 +8,13 @@ function PodcastsPage() {
       <section className="panel">
         <div className="panel-header">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-300/80">
-            Podcast archive
+            Archivio podcast
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">
-            Stories beyond the map
+            Storie oltre la mappa
           </h1>
           <p className="mt-3 text-sm leading-6 text-slate-300">
-            Explore audio narratives tied to the Lecco landscape. Spotify and YouTube integrations are
-            ready for future expansion.
+            Esplora narrazioni audio legate al paesaggio di Lecco. Integrazioni con Spotify e YouTube pronte per futuri sviluppi.
           </p>
         </div>
 
@@ -27,8 +26,8 @@ function PodcastsPage() {
           ) : null}
 
           {loading ? (
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-300">
-              Loading podcast episodes…
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-300">
+              Caricamento episodi podcast…
             </div>
           ) : null}
 
@@ -45,7 +44,7 @@ function PodcastsPage() {
                     src={episode.cover_image}
                   />
                 ) : null}
-                <p className="text-xs uppercase tracking-[0.18em] text-cyan-300/70">Episode</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-cyan-300/70">Episodio</p>
                 <h2 className="mt-2 text-lg font-semibold text-white">{episode.title}</h2>
                 <p className="mt-3 text-sm leading-6 text-slate-300">{episode.short_description}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -75,7 +74,7 @@ function PodcastsPage() {
 
             {!loading && episodes.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/60 p-5 text-sm text-slate-400 md:col-span-2 xl:col-span-3">
-                No podcast episodes are available yet.
+                Nessun episodio podcast disponibile.
               </div>
             ) : null}
           </div>
