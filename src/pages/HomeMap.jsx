@@ -88,48 +88,41 @@ function HomeMap() {
           </div>
 
           <div className="relative flex-1 overflow-hidden px-5 py-5">
-            <button
-              aria-label={isDesktopFiltersOpen ? 'Riduci filtri' : 'Espandi filtri'}
-              className="absolute -right-4 top-6 z-[2503] flex h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-950 text-cyan-300 shadow-xl transition hover:border-cyan-400/40"
-              type="button"
-              onClick={() => setIsDesktopFiltersOpen((value) => !value)}
-            >
-            </button>
 
             {isDesktopFiltersOpen ? (
               <div className="flex h-full min-h-0 flex-col gap-4">
                 <div className="rounded-3xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-lg">
+
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-400/10 text-cyan-300">
                       <FilterIcon />
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-white">Filtri</p>
-                      <p className="text-xs text-slate-400">Cronologia + periodo storico</p>
                     </div>
                   </div>
+                    
+                  <TimelineSlider periods={periods} />
+
+                  <label className="space-y-2 rounded-3xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-lg">
+                    <span className="flex items-center gap-2 text-sm font-medium text-slate-200">
+                      <LayersIcon className="h-4 w-4 text-cyan-300" />
+                      Periodo storico
+                    </span>
+                    <select
+                      className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
+                      value={selectedPeriodId}
+                      onChange={(event) => setSelectedPeriodId(event.target.value)}
+                    >
+                      <option value="all">Tutti i periodi</option>
+                      {periods.map((period) => (
+                        <option key={period.id} value={period.id}>
+                          {period.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
-
-                <TimelineSlider periods={periods} />
-
-                <label className="space-y-2 rounded-3xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-lg">
-                  <span className="flex items-center gap-2 text-sm font-medium text-slate-200">
-                    <LayersIcon className="h-4 w-4 text-cyan-300" />
-                    Historical period
-                  </span>
-                  <select
-                    className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                    value={selectedPeriodId}
-                    onChange={(event) => setSelectedPeriodId(event.target.value)}
-                  >
-                    <option value="all">Tutti i periodi</option>
-                    {periods.map((period) => (
-                      <option key={period.id} value={period.id}>
-                        {period.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
               </div>
             ) : (
               <div className="flex h-full items-start justify-center pt-14">
