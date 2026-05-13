@@ -33,7 +33,11 @@ function ImagePreviewCard({ image, onMarkPrimary, onRemove, disabled }) {
       <div className="space-y-3 p-4">
         <div>
           <p className="truncate text-sm font-medium text-slate-100">{image.file.name}</p>
-          <p className="mt-1 text-xs text-slate-400">{(image.file.size / (1024 * 1024)).toFixed(1)} MB</p>
+          {image.source === 'url' ? (
+            <p className="mt-1 text-xs text-slate-400">Link esterno</p>
+          ) : (
+            <p className="mt-1 text-xs text-slate-400">{(image.file.size / (1024 * 1024)).toFixed(1)} MB</p>
+          )}
         </div>
 
         <button

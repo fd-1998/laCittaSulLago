@@ -36,7 +36,7 @@ export async function createPlace(payload) {
 
 export async function insertPlaceImage(payload) {
   const rows = Array.isArray(payload) ? payload : [payload]
-  return supabase.from('place_images').insert(rows)
+  return supabase.from('place_images').insert(rows).select('*')
 }
 
 export async function fetchHistoricalPeriods() {

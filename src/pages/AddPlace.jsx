@@ -38,6 +38,25 @@ function createPreviewItem(file, isPrimary = false) {
     file,
     previewUrl: URL.createObjectURL(file),
     isPrimary,
+    source: 'file',
+    revokeUrl: true,
+  }
+}
+
+function createUrlPreviewItem(url, isPrimary = false) {
+  const trimmedUrl = url.trim()
+  const fileName = trimmedUrl.split('/').pop() || 'immagine-link'
+  return {
+    id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    file: {
+      name: fileName,
+      size: 0,
+    },
+    previewUrl: trimmedUrl,
+    imageUrl: trimmedUrl,
+    isPrimary,
+    source: 'url',
+    revokeUrl: false,
   }
 }
 
@@ -55,6 +74,8 @@ function AddPlace() {
   const [searchResults, setSearchResults] = useState([])
   const [searchError, setSearchError] = useState('')
   const [isSearching, setIsSearching] = useState(false)
+  const [imageUrlInput, setImageUrlInput] = useState('')
+  const [imageUrlError, setImageUrlError] = useState('')
   const imagesRef = useRef([])
   const searchAbortRef = useRef(null)
 
@@ -76,7 +97,11 @@ function AddPlace() {
 
   useEffect(() => {
     return () => {
-      imagesRef.current.forEach((image) => URL.revokeObjectURL(image.previewUrl))
+      imagesRef.current.forEach((image) => {
+        if (image.revokeUrl) {
+          URL.revokeObjectURL(image.previewUrl)
+        }
+      })
     }
   }, [])
 
@@ -179,7 +204,9 @@ function AddPlace() {
     setImages((current) => {
       const removed = current.find((image) => image.id === imageId)
       if (removed) {
-        URL.revokeObjectURL(removed.previewUrl)
+        if (removed.revokeUrl) {
+          URL.revokeObjectURL(removed.previewUrl)
+        }
       }
 
       const next = current.filter((image) => image.id !== imageId)
@@ -197,6 +224,34 @@ function AddPlace() {
 
   function markPrimaryImage(imageId) {
     setImages((current) => current.map((image) => ({ ...image, isPrimary: image.id === imageId })))
+  }
+
+  function handleAddImageUrl() {
+    const trimmed = imageUrlInput.trim()
+    if (!trimmed) {
+      setImageUrlError('Inserisci un link valido.')
+      return
+    }
+
+    let parsedUrl = null
+    try {
+      parsedUrl = new URL(trimmed)
+    } catch {
+      setImageUrlError('Il link non è valido.')
+      return
+    }
+
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      setImageUrlError('Il link deve iniziare con http o https.')
+      return
+    }
+
+    setImageUrlError('')
+    setImages((current) => {
+      const isPrimary = !current.some((image) => image.isPrimary)
+      return [...current, createUrlPreviewItem(trimmed, isPrimary)]
+    })
+    setImageUrlInput('')
   }
 
   const updateCoordinates = useCallback(({ latitude, longitude }) => {
@@ -354,57 +409,79 @@ function AddPlace() {
     }
 
     if (data?.id && images.length) {
-      const uploadResults = await Promise.all(
-        images.map(async (image, index) => {
-          const safeFileName = image.file.name.replace(/[^a-z0-9._-]/gi, '_')
-          const filePath = `public/${data.id}/${Date.now()}-${index}-${safeFileName}`
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('places')
-            .upload(filePath, image.file, {
-              upsert: false,
-              cacheControl: '3600',
-              contentType: image.file.type,
-            })
+      const urlImages = images.filter((image) => image.source === 'url')
+      const fileImages = images.filter((image) => image.source !== 'url')
 
-          if (uploadError) {
-            return { status: 'rejected', error: uploadError }
-          }
+      if (urlImages.length) {
+        const urlPayloads = urlImages.map((image) => ({
+          place_id: data.id,
+          image_url: image.imageUrl,
+          thumbnail_url: image.imageUrl,
+          caption: image.file.name,
+          is_primary: image.isPrimary,
+        }))
 
-          const publicPath = uploadData?.path ?? filePath
-          const { data: publicData } = supabase.storage.from('places').getPublicUrl(publicPath)
-          if (!publicData?.publicUrl) {
-            return { status: 'rejected', error: new Error('URL pubblico non disponibile') }
-          }
-
-          return {
-            status: 'fulfilled',
-            payload: {
-              place_id: data.id,
-              image_url: publicData?.publicUrl,
-              thumbnail_url: publicData?.publicUrl,
-              caption: image.file.name,
-              is_primary: image.isPrimary,
-            },
-          }
-        })
-      )
-
-      const successfulImages = uploadResults.filter((result) => result.status === 'fulfilled' && result.payload)
-      const failedUploads = uploadResults.filter((result) => result.status === 'rejected')
-
-      if (successfulImages.length) {
-        const { error: insertError } = await insertPlaceImage(successfulImages.map((result) => result.payload))
-        if (insertError) {
+        const { error: insertUrlError } = await insertPlaceImage(urlPayloads)
+        if (insertUrlError) {
           setIsSubmitting(false)
-          setError('Luogo salvato, ma non è stato possibile collegare le immagini al luogo.')
+          setError('Luogo salvato, ma non è stato possibile collegare le immagini da link.')
           return
         }
       }
 
-      if (failedUploads.length) {
-        setIsSubmitting(false)
-        setError(`Luogo salvato, ma ${failedUploads.length} caricamento${failedUploads.length > 1 ? 'i' : ''} immagine non è riuscito.`)
-        return
+      if (fileImages.length) {
+        const uploadResults = await Promise.all(
+          fileImages.map(async (image, index) => {
+            const safeFileName = image.file.name.replace(/[^a-z0-9._-]/gi, '_')
+            const filePath = `public/${data.id}/${Date.now()}-${index}-${safeFileName}`
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('places')
+              .upload(filePath, image.file, {
+                upsert: false,
+                cacheControl: '3600',
+                contentType: image.file.type,
+              })
+
+            if (uploadError) {
+              return { status: 'rejected', error: uploadError }
+            }
+
+            const publicPath = uploadData?.path ?? filePath
+            const { data: publicData } = supabase.storage.from('places').getPublicUrl(publicPath)
+            if (!publicData?.publicUrl) {
+              return { status: 'rejected', error: new Error('URL pubblico non disponibile') }
+            }
+
+            return {
+              status: 'fulfilled',
+              payload: {
+                place_id: data.id,
+                image_url: publicData?.publicUrl,
+                thumbnail_url: publicData?.publicUrl,
+                caption: image.file.name,
+                is_primary: image.isPrimary,
+              },
+            }
+          })
+        )
+
+        const successfulImages = uploadResults.filter((result) => result.status === 'fulfilled' && result.payload)
+        const failedUploads = uploadResults.filter((result) => result.status === 'rejected')
+
+        if (successfulImages.length) {
+          const { error: insertError } = await insertPlaceImage(successfulImages.map((result) => result.payload))
+          if (insertError) {
+            setIsSubmitting(false)
+            setError('Luogo salvato, ma non è stato possibile collegare le immagini al luogo.')
+            return
+          }
+        }
+
+        if (failedUploads.length) {
+          setIsSubmitting(false)
+          setError(`Luogo salvato, ma ${failedUploads.length} caricamento${failedUploads.length > 1 ? 'i' : ''} immagine non è riuscito.`)
+          return
+        }
       }
     }
 
@@ -647,6 +724,34 @@ function AddPlace() {
             </label>
 
             <div className="md:col-span-2">
+              <div className="mb-4 rounded-3xl border border-slate-800 bg-slate-950/60 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-200">Aggiungi immagine da link</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Incolla l'URL di un'immagine pubblica. Verrà mostrata in anteprima e salvata in <code className="rounded bg-slate-800 px-1">place_images</code>.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <input
+                    className="flex-1 rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-2.5 text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
+                    placeholder="https://..."
+                    value={imageUrlInput}
+                    onChange={(event) => setImageUrlInput(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddImageUrl}
+                    className="rounded-full bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+                  >
+                    Aggiungi link
+                  </button>
+                </div>
+                {imageUrlError ? (
+                  <p className="mt-2 text-xs text-rose-300">{imageUrlError}</p>
+                ) : null}
+              </div>
               <ImageUploader
                 disabled={isSubmitting}
                 images={images}
