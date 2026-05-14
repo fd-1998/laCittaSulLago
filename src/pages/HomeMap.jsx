@@ -119,7 +119,7 @@ function HomeMap() {
   }
 
   return (
-    <main className="relative h-[100dvh] w-screen overflow-hidden bg-slate-950">
+    <main className="relative h-[calc(100dvh-4.5rem)] w-screen overflow-hidden bg-slate-950 pt-[0]">
       <section
         className={`grid h-full w-full grid-cols-1 lg:transition-[grid-template-columns] ${
           isDesktopFiltersOpen
@@ -363,11 +363,11 @@ function HomeMap() {
           role="presentation"
         />
         <div
-          className={`absolute bottom-0 left-0 right-0 max-h-[82vh] rounded-t-3xl border-t border-slate-800 bg-slate-950/95 p-5 shadow-2xl transition-transform ${
+          className={`absolute bottom-0 left-0 right-0 flex max-h-[82vh] flex-col rounded-t-3xl border-t border-slate-800 bg-slate-950/95 p-5 shadow-2xl transition-transform ${
             selectedPlace ? 'translate-y-0' : 'translate-y-full'
           }`}
         >
-          <div className="overflow-auto pb-6">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-6">
             <PlaceDrawer
               place={selectedPlace}
               activeLayer={

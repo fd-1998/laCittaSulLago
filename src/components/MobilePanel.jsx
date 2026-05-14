@@ -12,7 +12,7 @@ function MobilePanel({ isOpen, title, children, onClose }) {
         role="presentation"
       />
       <div
-        className={`absolute bottom-0 left-0 right-0 max-h-[85vh] rounded-t-3xl border-t border-slate-800 bg-slate-950/95 p-6 shadow-2xl transition-transform ${
+        className={`absolute bottom-0 left-0 right-0 flex max-h-[70vh] flex-col rounded-t-3xl border-t border-slate-800 bg-slate-950/95 p-6 shadow-2xl transition-transform ${
           isOpen ? 'translate-y-0' : 'translate-y-full'
         }`}
       >
@@ -28,7 +28,7 @@ function MobilePanel({ isOpen, title, children, onClose }) {
             Chiudi
           </button>
         </div>
-        <div className="overflow-auto pb-6">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto pb-6">{children}</div>
       </div>
     </div>
   )
