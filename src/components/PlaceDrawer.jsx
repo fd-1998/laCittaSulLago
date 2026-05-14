@@ -1,34 +1,45 @@
 import { useMemo } from 'react'
 import { CloseIcon, TimelineIcon } from './UiIcons'
 
-function PlaceDrawer({ place, onClose, onToggleVisited }) {
+function PlaceDrawer({ place, activeLayer, activeLayers = [], onSelectLayer, onClose, onToggleVisited }) {
   const primaryImage = useMemo(() => {
-    if (!place) {
+    if (!activeLayer) {
       return null
     }
 
-    return place.place_images?.find((image) => image.is_primary) ?? place.place_images?.[0]
-  }, [place])
+    return (
+      activeLayer.place_images?.find((image) => image.is_primary) ??
+      activeLayer.place_images?.[0] ??
+      null
+    )
+  }, [activeLayer])
 
-  if (!place) {
+  if (!place || !activeLayer) {
     return null
   }
 
   const tags = place.place_tags?.map((tag) => tag.tags?.name).filter(Boolean) ?? []
   const podcasts =
-    place.place_podcast_episodes?.map((entry) => entry.podcast_episodes).filter(Boolean) ?? []
-  const period = place.historical_periods
+    activeLayer.place_podcast_episodes?.map((entry) => entry.podcast_episodes).filter(Boolean) ?? []
+  const notes = activeLayer.notes ?? []
+  const period = activeLayer.historical_periods
+  const images = activeLayer.place_images ?? []
 
   return (
     <aside className="pointer-events-auto w-full max-w-xl space-y-5 rounded-3xl border border-slate-800/80 bg-slate-950/90 p-6 shadow-2xl backdrop-blur">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/70">
-            {period?.name ?? 'Luogo storico'}
+            {period?.name ?? 'Periodo storico'}
           </p>
-          <h2 className="mt-2 text-2xl font-semibold text-white">{place.title}</h2>
+          <h2 className="mt-2 text-2xl font-semibold text-white">
+            {activeLayer.title ?? place.canonical_name ?? 'Luogo storico'}
+          </h2>
+          {place.canonical_name ? (
+            <p className="mt-1 text-sm text-slate-400">{place.canonical_name}</p>
+          ) : null}
           <p className="mt-2 text-xs text-slate-400">
-            {place.start_year} → {place.end_year}
+            {activeLayer.start_year} → {activeLayer.end_year}
           </p>
         </div>
         <button
@@ -41,15 +52,50 @@ function PlaceDrawer({ place, onClose, onToggleVisited }) {
         </button>
       </div>
 
+      {activeLayers.length > 1 ? (
+        <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-800/80 bg-slate-950/70 p-3">
+          {activeLayers.map((layer) => (
+            <button
+              key={layer.id}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                layer.id === activeLayer.id
+                  ? 'border-cyan-400/60 bg-cyan-400/10 text-cyan-200'
+                  : 'border-slate-800 text-slate-300 hover:border-cyan-400/40 hover:text-white'
+              }`}
+              type="button"
+              onClick={() => onSelectLayer?.(layer)}
+            >
+              {layer.title ?? period?.name ?? 'Layer'}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {primaryImage?.image_url ? (
         <img
-          alt={primaryImage.caption || place.title}
+          alt={primaryImage.caption || activeLayer.title || place.canonical_name}
           className="h-48 w-full rounded-2xl object-cover"
           src={primaryImage.image_url}
         />
       ) : null}
 
-      <p className="text-sm leading-6 text-slate-300">{place.long_description}</p>
+      {images.length > 1 ? (
+        <div className="grid grid-cols-3 gap-2">
+          {images
+            .filter((image) => image.thumbnail_url || image.image_url)
+            .slice(0, 6)
+            .map((image) => (
+              <img
+                key={image.id}
+                alt={image.caption || activeLayer.title || place.canonical_name}
+                className="h-20 w-full rounded-xl object-cover"
+                src={image.thumbnail_url || image.image_url}
+              />
+            ))}
+        </div>
+      ) : null}
+
+      <p className="text-sm leading-6 text-slate-300">{activeLayer.long_description}</p>
 
       <div className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-sm">
         <div>
@@ -57,6 +103,16 @@ function PlaceDrawer({ place, onClose, onToggleVisited }) {
           <p className="mt-1 text-slate-200">
             {place.latitude}, {place.longitude}
           </p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Cronologia</p>
+          <p className="mt-1 text-slate-200">
+            {activeLayer.start_year} → {activeLayer.end_year}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Periodo</p>
+          <p className="mt-1 text-slate-200">{period?.name ?? '—'}</p>
         </div>
         {tags.length ? (
           <div>
@@ -81,6 +137,20 @@ function PlaceDrawer({ place, onClose, onToggleVisited }) {
                 <li key={episode.id} className="rounded-2xl border border-slate-800 bg-slate-950/60 p-3">
                   <p className="text-sm font-semibold text-white">{episode.title}</p>
                   <p className="mt-1 text-slate-400">{episode.short_description}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {notes.length ? (
+          <div>
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Note</p>
+            <ul className="mt-2 space-y-2 text-xs text-slate-300">
+              {notes.map((note) => (
+                <li key={note.id} className="rounded-2xl border border-slate-800 bg-slate-950/60 p-3">
+                  <p className="text-sm font-semibold text-white">{note.title}</p>
+                  {note.subtitle ? <p className="mt-1 text-slate-400">{note.subtitle}</p> : null}
+                  {note.content ? <p className="mt-2 text-slate-400">{note.content}</p> : null}
                 </li>
               ))}
             </ul>

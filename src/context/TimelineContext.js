@@ -27,13 +27,13 @@ export function getTimelineLabel(year) {
   return periodBands.find((band) => year >= band.min && year <= band.max)?.label ?? 'Historical'
 }
 
-export function isPlaceVisibleAtYear(place, year) {
-  if (!place) {
+export function isLayerVisibleAtYear(layer, year) {
+  if (!layer) {
     return false
   }
 
-  const startYear = Number(place.start_year)
-  const endYear = Number(place.end_year)
+  const startYear = Number(layer.start_year)
+  const endYear = Number(layer.end_year)
 
   if (Number.isNaN(startYear) || Number.isNaN(endYear)) {
     return false
@@ -42,8 +42,19 @@ export function isPlaceVisibleAtYear(place, year) {
   return startYear <= year && year <= endYear
 }
 
-export function filterPlacesByYear(places, year) {
-  return places.filter((place) => isPlaceVisibleAtYear(place, year))
+export function getActiveLayersForPlace(place, year) {
+  const layers = place?.place_historical_layers ?? []
+  return layers
+    .filter((layer) => isLayerVisibleAtYear(layer, year))
+    .sort((a, b) => Number(b.start_year) - Number(a.start_year))
+}
+
+export function getDefaultLayerForPlace(place) {
+  const layers = place?.place_historical_layers ?? []
+  return layers
+    .slice()
+    .sort((a, b) => Number(b.start_year) - Number(a.start_year))
+    .find(Boolean) ?? null
 }
 
 export function TimelineProvider({ children }) {

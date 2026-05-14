@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import TimelineSlider from '../components/TimelineSlider'
-import { isPlaceVisibleAtYear, useTimeline } from '../context/TimelineContext'
+import { getActiveLayersForPlace, useTimeline } from '../context/TimelineContext'
 import usePlacesData from '../hooks/usePlacesData'
 
 function TimelinePage() {
@@ -14,13 +14,16 @@ function TimelinePage() {
     }
   }, [setTimelineEnabled, timelineEnabled])
 
-  const visiblePlaces = useMemo(
-    () =>
-      places
-        .filter((place) => isPlaceVisibleAtYear(place, selectedYear))
-        .sort((a, b) => a.start_year - b.start_year),
-    [places, selectedYear],
-  )
+  const visibleLayers = useMemo(() => {
+    return places
+      .flatMap((place) =>
+        getActiveLayersForPlace(place, selectedYear).map((layer) => ({
+          place,
+          layer,
+        })),
+      )
+      .sort((a, b) => Number(a.layer.start_year) - Number(b.layer.start_year))
+  }, [places, selectedYear])
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
@@ -39,7 +42,7 @@ function TimelinePage() {
               <TimelineSlider periods={periods} />
 
               <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-300">
-                {visiblePlaces.length} luoghi sono attivi nell'anno selezionato.
+                {visibleLayers.length} livelli storici sono attivi nell'anno selezionato.
               </div>
 
               <Link
@@ -56,7 +59,7 @@ function TimelinePage() {
           <div className="panel-header flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-300/80">
-                Luoghi attivi
+                Livelli attivi
               </p>
               <h2 className="mt-1 text-xl font-semibold text-white">Visibili in questo periodo</h2>
             </div>
@@ -77,21 +80,27 @@ function TimelinePage() {
             ) : null}
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {visiblePlaces.map((place) => (
+              {visibleLayers.map(({ place, layer }) => (
                 <article
-                  key={place.id}
+                  key={layer.id}
                   className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 shadow-lg shadow-black/10"
                 >
                   <p className="text-xs uppercase tracking-[0.18em] text-cyan-300/70">
-                    {place.historical_periods?.name || 'Luogo storico'}
+                    {layer.historical_periods?.name || 'Periodo storico'}
                   </p>
-                  <h3 className="mt-2 text-lg font-semibold text-white">{place.title}</h3>
-                  <p className="mt-3 text-sm leading-6 text-slate-300">{place.short_description}</p>
+                  <h3 className="mt-2 text-lg font-semibold text-white">
+                    {layer.title || place.canonical_name}
+                  </h3>
+                  {place.canonical_name ? (
+                    <p className="mt-1 text-xs text-slate-400">{place.canonical_name}</p>
+                  ) : null}
+                  <p className="mt-3 text-sm leading-6 text-slate-300">{layer.short_description}</p>
                   <p className="mt-4 text-xs text-slate-500">
-                    {place.start_year} → {place.end_year}
+                    {layer.start_year} → {layer.end_year}
                   </p>
                   <Link
                     to={`/place/${place.id}`}
+                    state={{ layerId: layer.id }}
                     className="mt-4 inline-flex rounded-full border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-800"
                   >
                     Vedi dettagli
@@ -99,9 +108,9 @@ function TimelinePage() {
                 </article>
               ))}
 
-              {!loading && visiblePlaces.length === 0 ? (
+              {!loading && visibleLayers.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/60 p-5 text-sm text-slate-400 md:col-span-2 xl:col-span-3">
-                  Nessun luogo attivo per quest'anno.
+                  Nessun livello attivo per quest'anno.
                 </div>
               ) : null}
             </div>

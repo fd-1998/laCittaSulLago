@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { fetchHistoricalPeriods, fetchPlaces } from '../services/places'
 import { useTimeline } from '../context/TimelineContext'
 
@@ -7,20 +7,23 @@ const toNumber = (value) => {
   return Number.isNaN(parsed) ? null : parsed
 }
 
-const getYearsFromPlaces = (places) => {
+const getYearsFromLayers = (places) => {
   const years = new Set()
 
   places.forEach((place) => {
-    const startYear = toNumber(place.start_year)
-    const endYear = toNumber(place.end_year)
+    const layers = place?.place_historical_layers ?? []
+    layers.forEach((layer) => {
+      const startYear = toNumber(layer.start_year)
+      const endYear = toNumber(layer.end_year)
 
-    if (startYear != null) {
-      years.add(startYear)
-    }
+      if (startYear != null) {
+        years.add(startYear)
+      }
 
-    if (endYear != null) {
-      years.add(endYear)
-    }
+      if (endYear != null) {
+        years.add(endYear)
+      }
+    })
   })
 
   return Array.from(years).sort((a, b) => a - b)
@@ -57,7 +60,7 @@ export default function usePlacesData() {
       setPlaces(loadedPlaces)
       setPeriods(loadedPeriods)
 
-      const years = getYearsFromPlaces(loadedPlaces)
+      const years = getYearsFromLayers(loadedPlaces)
       if (years.length > 0) {
         setYears(years)
       }
@@ -74,25 +77,10 @@ export default function usePlacesData() {
     })()
   }, [loadPlaces])
 
-  const primaryImages = useMemo(() => {
-    const imageMap = new Map()
-
-    places.forEach((place) => {
-      const images = place.place_images ?? []
-      const primary = images.find((image) => image.is_primary) ?? images[0]
-      if (primary) {
-        imageMap.set(place.id, primary)
-      }
-    })
-
-    return imageMap
-  }, [places])
-
   return {
     places,
     setPlaces,
     periods,
-    primaryImages,
     loading,
     error,
     reload: loadPlaces,

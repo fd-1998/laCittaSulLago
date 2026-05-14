@@ -15,7 +15,7 @@ import {
   PodcastsIcon,
   TimelineIcon,
 } from '../components/UiIcons'
-import { isPlaceVisibleAtYear, useTimeline } from '../context/TimelineContext'
+import { getActiveLayersForPlace, getDefaultLayerForPlace, useTimeline } from '../context/TimelineContext'
 import usePlacesData from '../hooks/usePlacesData'
 import { updatePlaceVisited } from '../services/places'
 import SiteLogo from '../assets/logo.png'
@@ -25,6 +25,7 @@ function HomeMap() {
   const { selectedYear, timelineEnabled } = useTimeline()
   const { places, setPlaces, periods, loading, error } = usePlacesData()
   const [selectedPlace, setSelectedPlace] = useState(null)
+  const [selectedLayerByPlaceId, setSelectedLayerByPlaceId] = useState({})
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false)
   const [isDesktopFiltersOpen, setIsDesktopFiltersOpen] = useState(true)
   const [selectedPeriodId, setSelectedPeriodId] = useState('all')
@@ -38,15 +39,64 @@ function HomeMap() {
     }
   }, [])
 
-  const filteredPlaces = useMemo(() => {
-    return places.filter((place) => {
-      const matchesTimeline = timelineEnabled ? isPlaceVisibleAtYear(place, selectedYear) : true
-      const matchesPeriod =
-        selectedPeriodId === 'all' || String(place.period_id) === String(selectedPeriodId)
+  const resolvedPlaces = useMemo(() => {
+    return places
+      .map((place) => {
+        const activeLayers = timelineEnabled
+          ? getActiveLayersForPlace(place, selectedYear)
+          : [getDefaultLayerForPlace(place)].filter(Boolean)
 
-      return matchesTimeline && matchesPeriod
+        if (!activeLayers.length) {
+          return null
+        }
+
+        const selectedLayerId = selectedLayerByPlaceId[place.id]
+        const activeLayer =
+          activeLayers.find((layer) => layer.id === selectedLayerId) ?? activeLayers[0]
+
+        return {
+          place,
+          activeLayers,
+          activeLayer,
+        }
+      })
+      .filter(Boolean)
+  }, [places, selectedYear, selectedLayerByPlaceId, timelineEnabled])
+
+  const filteredPlaces = useMemo(() => {
+    return resolvedPlaces.filter(({ activeLayers, activeLayer }) => {
+      if (selectedPeriodId === 'all') {
+        return true
+      }
+
+      const periodId = String(selectedPeriodId)
+      return (
+        activeLayer?.historical_period_id != null &&
+        String(activeLayer.historical_period_id) === periodId
+      ) || activeLayers.some((layer) => String(layer.historical_period_id) === periodId)
     })
-  }, [places, selectedYear, timelineEnabled, selectedPeriodId])
+  }, [resolvedPlaces, selectedPeriodId])
+
+  const markers = useMemo(
+    () =>
+      filteredPlaces.map((entry) => ({
+        place: entry.place,
+        layer: entry.activeLayer,
+        activeLayers: entry.activeLayers,
+      })),
+    [filteredPlaces],
+  )
+
+  useEffect(() => {
+    if (!selectedPlace) {
+      return
+    }
+
+    const stillVisible = filteredPlaces.some((entry) => entry.place.id === selectedPlace.id)
+    if (!stillVisible) {
+      setSelectedPlace(null)
+    }
+  }, [filteredPlaces, selectedPlace])
 
   const handleToggleVisited = async () => {
     if (!selectedPlace) {
@@ -180,15 +230,38 @@ function HomeMap() {
 
           <div className="h-full w-full">
             <Map
-              places={filteredPlaces}
+              markers={markers}
               activePlaceId={selectedPlace?.id}
-              onSelectPlace={(place) => setSelectedPlace(place)}
+              onSelectPlace={(place, layer) => {
+                setSelectedPlace(place)
+                if (layer?.id) {
+                  setSelectedLayerByPlaceId((current) => ({
+                    ...current,
+                    [place.id]: layer.id,
+                  }))
+                }
+              }}
             />
           </div>
 
           <div className="pointer-events-none absolute inset-0 z-[2502] hidden items-end justify-end p-6 lg:flex">
             <PlaceDrawer
               place={selectedPlace}
+              activeLayer={
+                filteredPlaces.find((entry) => entry.place.id === selectedPlace?.id)?.activeLayer
+              }
+              activeLayers={
+                filteredPlaces.find((entry) => entry.place.id === selectedPlace?.id)?.activeLayers ??
+                []
+              }
+              onSelectLayer={(layer) => {
+                if (layer?.id && selectedPlace?.id) {
+                  setSelectedLayerByPlaceId((current) => ({
+                    ...current,
+                    [selectedPlace.id]: layer.id,
+                  }))
+                }
+              }}
               onClose={() => setSelectedPlace(null)}
               onToggleVisited={handleToggleVisited}
             />
@@ -256,18 +329,28 @@ function HomeMap() {
             </label>
 
             <div className="space-y-3">
-              {filteredPlaces.map((place) => (
+              {filteredPlaces.map(({ place, activeLayer }) => (
                 <button
                   key={place.id}
                   className="w-full rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-left shadow-lg shadow-black/10 transition hover:border-cyan-400/40"
                   type="button"
                   onClick={() => {
                     setSelectedPlace(place)
+                    if (activeLayer?.id) {
+                      setSelectedLayerByPlaceId((current) => ({
+                        ...current,
+                        [place.id]: activeLayer.id,
+                      }))
+                    }
                     setIsMobileFiltersOpen(false)
                   }}
                 >
-                  <h3 className="text-base font-semibold text-white">{place.title}</h3>
-                  <p className="mt-2 text-sm text-slate-300">{place.short_description}</p>
+                  <h3 className="text-base font-semibold text-white">
+                    {activeLayer?.title ?? place.canonical_name}
+                  </h3>
+                  <p className="mt-2 text-sm text-slate-300">
+                    {activeLayer?.short_description}
+                  </p>
                 </button>
               ))}
             </div>
@@ -294,6 +377,21 @@ function HomeMap() {
           <div className="overflow-auto pb-6">
             <PlaceDrawer
               place={selectedPlace}
+              activeLayer={
+                filteredPlaces.find((entry) => entry.place.id === selectedPlace?.id)?.activeLayer
+              }
+              activeLayers={
+                filteredPlaces.find((entry) => entry.place.id === selectedPlace?.id)?.activeLayers ??
+                []
+              }
+              onSelectLayer={(layer) => {
+                if (layer?.id && selectedPlace?.id) {
+                  setSelectedLayerByPlaceId((current) => ({
+                    ...current,
+                    [selectedPlace.id]: layer.id,
+                  }))
+                }
+              }}
               onClose={() => setSelectedPlace(null)}
               onToggleVisited={handleToggleVisited}
             />

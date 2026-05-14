@@ -3,9 +3,16 @@ import { useNavigate } from 'react-router-dom'
 import CoordinatePicker from '../components/CoordinatePicker'
 import ImageUploader from '../components/ImageUploader'
 import { supabase } from '../lib/supabase'
-import { createPlace, fetchHistoricalPeriods, insertPlaceImage, createHistoricalPeriod } from '../services/places'
+import {
+  createHistoricalLayer,
+  createHistoricalPeriod,
+  createPlace,
+  fetchHistoricalPeriods,
+  insertLayerImage,
+} from '../services/places'
 
 const initialForm = {
+  canonical_name: '',
   title: '',
   short_description: '',
   long_description: '',
@@ -14,6 +21,8 @@ const initialForm = {
   start_year: '',
   end_year: '',
   period_id: '',
+  marker_color: '#38bdf8',
+  marker_icon: '',
   visited: false,
 }
 
@@ -348,8 +357,13 @@ function AddPlace() {
     const endYear = Number(form.end_year)
     const resolvedPeriodId = resolvePeriodId(form.period_id)
 
+    if (!form.canonical_name.trim()) {
+      setError('Compila il nome canonico del luogo.')
+      return
+    }
+
     if (!form.title.trim() || !form.short_description.trim() || !form.long_description.trim()) {
-      setError('Compila il titolo, la descrizione breve e la descrizione estesa.')
+      setError('Compila il titolo del livello, la descrizione breve e la descrizione estesa.')
       return
     }
 
@@ -390,15 +404,10 @@ function AddPlace() {
 
     setIsSubmitting(true)
 
-    const { data, error: supabaseError } = await createPlace({
-      title: form.title.trim(),
-      short_description: form.short_description.trim(),
-      long_description: form.long_description.trim(),
+    const { data: placeData, error: supabaseError } = await createPlace({
+      canonical_name: form.canonical_name.trim(),
       latitude,
       longitude,
-      start_year: startYear,
-      end_year: endYear,
-      period_id: resolvedPeriodId,
       visited: form.visited,
     })
 
@@ -408,20 +417,38 @@ function AddPlace() {
       return
     }
 
-    if (data?.id && images.length) {
+    const { data: layerData, error: layerError } = await createHistoricalLayer({
+      place_id: placeData?.id,
+      historical_period_id: resolvedPeriodId,
+      title: form.title.trim(),
+      short_description: form.short_description.trim(),
+      long_description: form.long_description.trim(),
+      start_year: startYear,
+      end_year: endYear,
+      marker_color: form.marker_color || '#38bdf8',
+      marker_icon: form.marker_icon?.trim() || null,
+    })
+
+    if (layerError) {
+      setIsSubmitting(false)
+      setError(layerError.message || 'Errore durante la creazione del livello storico.')
+      return
+    }
+
+    if (layerData?.id && images.length) {
       const urlImages = images.filter((image) => image.source === 'url')
       const fileImages = images.filter((image) => image.source !== 'url')
 
       if (urlImages.length) {
         const urlPayloads = urlImages.map((image) => ({
-          place_id: data.id,
+          historical_layer_id: layerData.id,
           image_url: image.imageUrl,
           thumbnail_url: image.imageUrl,
           caption: image.file.name,
           is_primary: image.isPrimary,
         }))
 
-        const { error: insertUrlError } = await insertPlaceImage(urlPayloads)
+        const { error: insertUrlError } = await insertLayerImage(urlPayloads)
         if (insertUrlError) {
           setIsSubmitting(false)
           setError('Luogo salvato, ma non è stato possibile collegare le immagini da link.')
@@ -433,7 +460,7 @@ function AddPlace() {
         const uploadResults = await Promise.all(
           fileImages.map(async (image, index) => {
             const safeFileName = image.file.name.replace(/[^a-z0-9._-]/gi, '_')
-            const filePath = `public/${data.id}/${Date.now()}-${index}-${safeFileName}`
+            const filePath = `public/${placeData.id}/${Date.now()}-${index}-${safeFileName}`
             const { data: uploadData, error: uploadError } = await supabase.storage
               .from('places')
               .upload(filePath, image.file, {
@@ -455,7 +482,7 @@ function AddPlace() {
             return {
               status: 'fulfilled',
               payload: {
-                place_id: data.id,
+                historical_layer_id: layerData.id,
                 image_url: publicData?.publicUrl,
                 thumbnail_url: publicData?.publicUrl,
                 caption: image.file.name,
@@ -469,7 +496,7 @@ function AddPlace() {
         const failedUploads = uploadResults.filter((result) => result.status === 'rejected')
 
         if (successfulImages.length) {
-          const { error: insertError } = await insertPlaceImage(successfulImages.map((result) => result.payload))
+          const { error: insertError } = await insertLayerImage(successfulImages.map((result) => result.payload))
           if (insertError) {
             setIsSubmitting(false)
             setError('Luogo salvato, ma non è stato possibile collegare le immagini al luogo.')
@@ -498,7 +525,7 @@ function AddPlace() {
               </p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">Aggiungi un luogo</h1>
               <p className="mt-3 text-sm leading-6 text-slate-300">
-                Salva un nuovo luogo storico nella tabella <code className="rounded bg-slate-800 px-2 py-0.5">places</code>.
+                Salva un luogo stabile in <code className="rounded bg-slate-800 px-2 py-0.5">places</code> e il suo livello storico in <code className="rounded bg-slate-800 px-2 py-0.5">place_historical_layers</code>.
               </p>
         </div>
 
@@ -511,7 +538,19 @@ function AddPlace() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-200">Titolo</span>
+              <span className="text-sm font-medium text-slate-200">Nome canonico luogo</span>
+              <input
+                className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
+                name="canonical_name"
+                required
+                value={form.canonical_name}
+                onChange={updateField}
+                placeholder="Es. Monte Barro"
+              />
+            </label>
+
+            <label className="space-y-2 md:col-span-2">
+              <span className="text-sm font-medium text-slate-200">Titolo livello storico</span>
               <input
                 className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
                 name="title"
@@ -641,6 +680,28 @@ function AddPlace() {
               />
             </label>
 
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-200">Colore marker</span>
+              <input
+                className="h-12 w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-2 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
+                name="marker_color"
+                type="color"
+                value={form.marker_color}
+                onChange={updateField}
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-200">Icona marker (opzionale)</span>
+              <input
+                className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
+                name="marker_icon"
+                value={form.marker_icon}
+                onChange={updateField}
+                placeholder="Es. castle, torch, fortress"
+              />
+            </label>
+
             <div className="space-y-2 md:col-span-2">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm font-medium text-slate-200">Periodo storico</span>
@@ -729,7 +790,7 @@ function AddPlace() {
                   <div>
                     <p className="text-sm font-medium text-slate-200">Aggiungi immagine da link</p>
                     <p className="mt-1 text-xs text-slate-400">
-                      Incolla l'URL di un'immagine pubblica. Verrà mostrata in anteprima e salvata in <code className="rounded bg-slate-800 px-1">place_images</code>.
+                      Incolla l'URL di un'immagine pubblica. Verrà mostrata in anteprima e salvata in <code className="rounded bg-slate-800 px-1">place_images</code> con riferimento al livello storico.
                     </p>
                   </div>
                 </div>
