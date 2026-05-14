@@ -26,7 +26,7 @@ function PlaceDrawer({ place, activeLayer, activeLayers = [], onSelectLayer, onC
   const images = activeLayer.place_images ?? []
 
   return (
-    <aside className="pointer-events-auto flex w-full max-w-xl flex-col rounded-3xl border border-slate-800/80 bg-slate-950/90 p-6 shadow-2xl backdrop-blur lg:h-full lg:max-h-full">
+    <aside className="pointer-events-auto flex w-full max-w-xl flex-col rounded-3xl border border-slate-800/80 bg-slate-950/90 p-6 shadow-2xl backdrop-blur lg:h-full lg:max-h-full lg:overflow-y-auto lg:overscroll-contain lg:touch-pan-y">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/70">
@@ -52,7 +52,7 @@ function PlaceDrawer({ place, activeLayer, activeLayers = [], onSelectLayer, onC
         </button>
       </div>
 
-      <div className="mt-5 min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain pr-1">
+      <div className="mt-5 space-y-5 pr-1 lg:pb-6">
         {activeLayers.length > 1 ? (
           <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-800/80 bg-slate-950/70 p-3">
             {activeLayers.map((layer) => (

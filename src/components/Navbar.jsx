@@ -52,14 +52,14 @@ function Navbar({ variant = 'sticky' }) {
           >
             Podcast
           </NavLink>
-          <NavLink
+          {/* <NavLink
             to="/notes"
             className={({ isActive }) =>
               `${linkBase} ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
             }
           >
             Note
-          </NavLink>
+          </NavLink> */}
           <NavLink
             to="/database"
             className={({ isActive }) =>

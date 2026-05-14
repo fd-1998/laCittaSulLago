@@ -237,7 +237,7 @@ function HomeMap() {
             />
           </div>
 
-          <div className="pointer-events-none absolute inset-0 z-[2502] hidden items-end justify-end p-6 lg:flex">
+          <div className="pointer-events-none absolute inset-0 z-[2502] hidden h-full items-end justify-end p-6 lg:flex">
             <PlaceDrawer
               place={selectedPlace}
               activeLayer={
