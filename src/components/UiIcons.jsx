@@ -4,6 +4,7 @@ import {
   Filter,
   Layers,
   Search,
+  Database,
   Home,
   Clock,
   Mic,
@@ -27,6 +28,7 @@ export const CloseIcon = wrap(X)
 export const FilterIcon = wrap(Filter)
 export const LayersIcon = wrap(Layers)
 export const SearchIcon = wrap(Search)
+export const DatabaseIcon = wrap(Database)
 export const HomeIcon = wrap(Home)
 export const TimelineIcon = wrap(Clock)
 export const PodcastsIcon = wrap(Mic)

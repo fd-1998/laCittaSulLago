@@ -18,14 +18,12 @@ function Navbar({ variant = 'sticky' }) {
         {/* Mobile menu button moved to shared MobileMenu component */}
 
         <NavLink to="/" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-400/15 text-cyan-300 shadow-lg shadow-cyan-500/10 ring-1 ring-cyan-400/20">
-            GIS
-          </div>
+
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-cyan-300/80">
               La Città sul Lago
             </p>
-            <p className="text-xs text-slate-400">Racconti storici e culturali</p>
+            <p className="text-xs text-slate-400">Atlante storico di Lecco</p>
           </div>
         </NavLink>
 
@@ -61,6 +59,14 @@ function Navbar({ variant = 'sticky' }) {
             }
           >
             Note
+          </NavLink>
+          <NavLink
+            to="/database"
+            className={({ isActive }) =>
+              `${linkBase} ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
+            }
+          >
+            Database
           </NavLink>
           <NavLink
             to="/add-location"

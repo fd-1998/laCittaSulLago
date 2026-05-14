@@ -7,6 +7,7 @@ import NotesPage from './pages/NotesPage'
 import PodcastsPage from './pages/PodcastsPage'
 import PlaceDetail from './pages/PlaceDetail'
 import TimelinePage from './pages/TimelinePage'
+import DatabaseDump from './pages/DatabaseDump'
 
 function App() {
   const location = useLocation()
@@ -14,8 +15,8 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      {!isHome ? <Navbar variant="sticky" /> : null}
-
+      {/* {!isHome ? <Navbar variant="sticky" /> : null} */}
+      <Navbar variant="sticky" />
       {/* mobile menu mounted globally so all pages share the same mobile menu component */}
       <MobileMenu />
 
@@ -24,6 +25,7 @@ function App() {
         <Route path="/timeline" element={<TimelinePage />} />
         <Route path="/podcasts" element={<PodcastsPage />} />
         <Route path="/notes" element={<NotesPage />} />
+        <Route path="/database" element={<DatabaseDump />} />
         <Route path="/add-location" element={<AddPlace />} />
         <Route path="/place/:id" element={<PlaceDetail />} />
         <Route path="*" element={<Navigate to="/" replace />} />

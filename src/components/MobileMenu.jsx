@@ -6,6 +6,7 @@ import {
   NotesIcon,
   PodcastsIcon,
   TimelineIcon,
+  DatabaseIcon,
   MenuIcon,
   CloseIcon,
 } from './UiIcons'
@@ -15,6 +16,7 @@ const mobileLinks = [
   { to: '/timeline', label: 'Cronologia', icon: TimelineIcon },
   { to: '/podcasts', label: 'Podcast', icon: PodcastsIcon },
   { to: '/notes', label: 'Note', icon: NotesIcon },
+  { to: '/database', label: 'Database', icon: DatabaseIcon },
   { to: '/add-location', label: 'Aggiungi', icon: AddIcon },
 ]
 
@@ -23,7 +25,7 @@ export default function MobileMenu() {
 
   return (
     <>
-      <div className="fixed left-4 top-4 z-[99997] flex items-center gap-2 lg:hidden">
+      <div className="fixed right-4 top-4 z-[99997] flex items-center gap-2 lg:hidden">
         <button
           aria-label={isOpen ? 'Chiudi menu' : 'Apri menu'}
           className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-800/80 bg-slate-950/80 text-slate-100 shadow-2xl backdrop-blur transition hover:bg-slate-800/90"
@@ -43,8 +45,8 @@ export default function MobileMenu() {
       />
 
       <aside
-        className={`fixed left-0 top-0 z-[99999] flex h-full w-72 flex-col gap-5 border-r border-slate-800 bg-slate-950 p-5 text-slate-100 shadow-2xl transition-transform lg:hidden ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed right-0 top-0 z-[99999] flex h-full w-72 flex-col gap-5 border-l border-slate-800 bg-slate-950 p-5 text-slate-100 shadow-2xl transition-transform lg:hidden ${
+          isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         <div className="flex items-center gap-2">

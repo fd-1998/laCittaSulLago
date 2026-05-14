@@ -128,14 +128,7 @@ function HomeMap() {
         }`}
       >
         <aside className="relative z-[2500] hidden h-full flex-col border-r border-slate-800/80 bg-slate-950/80 backdrop-blur lg:flex">
-          <div className="sticky top-0 z-[2501] border-b border-slate-800/80 bg-slate-950/90 px-5 py-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300/80">
-              Atlante storico di Lecco
-            </p>
-            <h1 className="mt-2 text-2xl font-semibold text-white">La Città sul Lago</h1>
-            {loading ? <p className="mt-2 text-xs text-slate-400">Caricamento archivio…</p> : null}
-            {error ? <p className="mt-2 text-xs text-rose-300">{error}</p> : null}
-          </div>
+          
 
           <div className="relative flex-1 overflow-hidden px-5 py-5">
 
@@ -187,7 +180,7 @@ function HomeMap() {
         <section className="relative h-full min-w-0">
           {/* Mobile menu is now a shared component mounted in App */}
 
-          <div className="absolute flex flex-row items-center gap-3 right-4 top-4 z-[2500] max-w-[min(18rem,calc(100vw-6rem))] rounded-3xl border border-slate-800/80 bg-slate-950/70 px-4 py-3 shadow-2xl backdrop-blur lg:hidden text-right">
+          {/* <div className="absolute flex flex-row items-center gap-3 right-4 top-4 z-[2500] max-w-[min(18rem,calc(100vw-6rem))] rounded-3xl border border-slate-800/80 bg-slate-950/70 px-4 py-3 shadow-2xl backdrop-blur lg:hidden text-right">
             <div className="flex-shrink-0">
               <img src={SiteLogo} alt="Logo" className="h-10 w-10 rounded-md object-cover" />
             </div>
@@ -195,7 +188,7 @@ function HomeMap() {
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300/80">La Città sul Lago</p>
               <h2 className="mt-1 text-xs text-white">Atlante storico di Lecco</h2>
             </div>
-          </div>
+          </div> */}
 
           <button
             aria-label="Apri filtri"
@@ -208,7 +201,7 @@ function HomeMap() {
             <FilterIcon className="h-5 w-5" />
             <span className="text-sm font-semibold tracking-wide">Filtri</span>
           </button>
-
+{/* 
           <div className="absolute right-4 top-4 z-[2501] hidden items-center gap-2 rounded-full border border-slate-800/80 bg-slate-950/70 px-3 py-2 shadow-2xl backdrop-blur lg:flex">
             {[
               ['/', 'Mappa', HomeIcon],
@@ -226,7 +219,7 @@ function HomeMap() {
                 <span>{label}</span>
               </Link>
             ))}
-          </div>
+          </div> */}
 
           <div className="h-full w-full">
             <Map
