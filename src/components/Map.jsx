@@ -107,9 +107,15 @@ function Map({ markers = [], onSelectPlace, activePlaceId }) {
       const period = layer.historical_periods
       const periodColor = layer.marker_color || period?.color || '#38bdf8'
       const isVisited = Boolean(place.visited)
+      const allImages = place.place_historical_layers
+        ?.flatMap((entry) => entry?.place_images ?? [])
+        .filter(Boolean) ?? []
+      const primaryImage = allImages.find((image) => image.is_primary)
       const displayImage =
-        layer.place_images?.find((image) => image.is_primary)?.thumbnail_url ||
-        layer.place_images?.[0]?.thumbnail_url
+        primaryImage?.thumbnail_url ||
+        primaryImage?.image_url ||
+        allImages[0]?.thumbnail_url ||
+        allImages[0]?.image_url
 
       const tooltipHtml = `
         <div style="min-width: 220px; max-width: 280px; font-family: system-ui, sans-serif;">
@@ -118,9 +124,9 @@ function Map({ markers = [], onSelectPlace, activePlaceId }) {
               ? `<img src="${displayImage}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 12px; margin-bottom: 8px;" />`
               : ''
           }
-          <h3 style="margin: 0 0 4px; font-size: 15px;">${layer.title ?? place.canonical_name ?? 'Luogo senza titolo'}</h3>
+          <h3 style="margin: 0 0 4px; font-size: 15px;">${place.canonical_name ?? 'Luogo senza titolo'}</h3>
           <p style="margin: 0 0 6px; font-size: 12px; color: #94a3b8;">${
-            period?.name ?? place.canonical_name ?? 'Luogo storico'
+            period?.name ?? 'Periodo storico'
           }</p>
           <p style="margin: 0; font-size: 12px; line-height: 1.45; color: #cbd5f5;">${
             (layer.short_description ?? '').slice(0, 120)

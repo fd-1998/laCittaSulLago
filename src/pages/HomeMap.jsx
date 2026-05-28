@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Map from '../components/Map'
 import PlaceDrawer from '../components/PlaceDrawer'
@@ -29,6 +29,8 @@ function HomeMap() {
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false)
   const [isDesktopFiltersOpen, setIsDesktopFiltersOpen] = useState(true)
   const [selectedPeriodId, setSelectedPeriodId] = useState('all')
+  const drawerDragStartRef = useRef(null)
+  const drawerDragActiveRef = useRef(false)
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow
@@ -116,6 +118,38 @@ function HomeMap() {
       current.map((place) => (place.id === data.id ? { ...place, visited: data.visited } : place)),
     )
     setSelectedPlace((current) => (current ? { ...current, visited: data.visited } : current))
+  }
+
+  const handlePlaceUpdated = (updatedPlace) => {
+    setPlaces((current) =>
+      current.map((place) => (place.id === updatedPlace.id ? updatedPlace : place)),
+    )
+
+    setSelectedPlace((current) => (current?.id === updatedPlace.id ? updatedPlace : current))
+  }
+
+  const handleMobileDrawerPointerDown = (event) => {
+    drawerDragActiveRef.current = true
+    drawerDragStartRef.current = event.clientY
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  }
+
+  const handleMobileDrawerPointerMove = (event) => {
+    if (!drawerDragActiveRef.current || drawerDragStartRef.current == null) {
+      return
+    }
+
+    const delta = event.clientY - drawerDragStartRef.current
+    if (delta > 80) {
+      drawerDragActiveRef.current = false
+      drawerDragStartRef.current = null
+      setSelectedPlace(null)
+    }
+  }
+
+  const handleMobileDrawerPointerUp = () => {
+    drawerDragActiveRef.current = false
+    drawerDragStartRef.current = null
   }
 
   return (
@@ -237,6 +271,23 @@ function HomeMap() {
             />
           </div>
 
+          <Link
+            to="/add-location"
+            className="fixed bottom-8 right-6 z-[2600] inline-flex items-center gap-2 rounded-full bg-cyan-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-2xl transition hover:bg-cyan-300 lg:px-5"
+          >
+            <AddIcon className="h-4 w-4" />
+            <span className="hidden lg:inline">Aggiungi luogo</span>
+          </Link>
+
+          {selectedPlace ? (
+            <button
+              className="absolute inset-0 z-[2501] hidden cursor-default lg:block"
+              type="button"
+              aria-label="Chiudi scheda luogo"
+              onClick={() => setSelectedPlace(null)}
+            />
+          ) : null}
+
           <div className="pointer-events-none absolute inset-0 z-[2502] hidden h-full items-end justify-end p-6 lg:flex">
             <PlaceDrawer
               place={selectedPlace}
@@ -247,6 +298,7 @@ function HomeMap() {
                 filteredPlaces.find((entry) => entry.place.id === selectedPlace?.id)?.activeLayers ??
                 []
               }
+              periods={periods}
               onSelectLayer={(layer) => {
                 if (layer?.id && selectedPlace?.id) {
                   setSelectedLayerByPlaceId((current) => ({
@@ -257,6 +309,7 @@ function HomeMap() {
               }}
               onClose={() => setSelectedPlace(null)}
               onToggleVisited={handleToggleVisited}
+              onPlaceUpdated={handlePlaceUpdated}
             />
           </div>
         </section>
@@ -367,6 +420,16 @@ function HomeMap() {
             selectedPlace ? 'translate-y-0' : 'translate-y-full'
           }`}
         >
+          <div
+            className="-mt-2 mb-2 flex items-center justify-center"
+            onPointerDown={handleMobileDrawerPointerDown}
+            onPointerMove={handleMobileDrawerPointerMove}
+            onPointerUp={handleMobileDrawerPointerUp}
+            onPointerCancel={handleMobileDrawerPointerUp}
+            role="presentation"
+          >
+            <span className="h-1.5 w-12 rounded-full bg-slate-700" />
+          </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-6">
             <PlaceDrawer
               place={selectedPlace}
@@ -377,6 +440,7 @@ function HomeMap() {
                 filteredPlaces.find((entry) => entry.place.id === selectedPlace?.id)?.activeLayers ??
                 []
               }
+              periods={periods}
               onSelectLayer={(layer) => {
                 if (layer?.id && selectedPlace?.id) {
                   setSelectedLayerByPlaceId((current) => ({
@@ -387,6 +451,7 @@ function HomeMap() {
               }}
               onClose={() => setSelectedPlace(null)}
               onToggleVisited={handleToggleVisited}
+              onPlaceUpdated={handlePlaceUpdated}
             />
           </div>
         </div>

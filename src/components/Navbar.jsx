@@ -36,14 +36,14 @@ function Navbar({ variant = 'sticky' }) {
           >
             Mappa
           </NavLink>
-          <NavLink
+          {/* <NavLink
             to="/timeline"
             className={({ isActive }) =>
               `${linkBase} ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
             }
           >
             Cronologia
-          </NavLink>
+          </NavLink> */}
           <NavLink
             to="/podcasts"
             className={({ isActive }) =>
@@ -68,15 +68,6 @@ function Navbar({ variant = 'sticky' }) {
           >
             Database
           </NavLink>
-          <NavLink
-            to="/add-location"
-            className={({ isActive }) =>
-              `${linkBase} ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
-            }
-          >
-            Aggiungi luogo
-          </NavLink>
-
           {timelineEnabled ? (
             <div className="ml-2 rounded-full border border-slate-800 bg-slate-900/90 px-4 py-2 text-right text-xs text-slate-300 shadow-sm">
               <p className="font-semibold text-white">{formatTimelineYear(selectedYear)}</p>

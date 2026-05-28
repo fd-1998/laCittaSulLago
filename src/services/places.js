@@ -48,6 +48,10 @@ export async function updatePlaceVisited(id, visited) {
   return supabase.from('places').update({ visited }).eq('id', id).select(PLACE_SELECT).single()
 }
 
+export async function updatePlace(id, payload) {
+  return supabase.from('places').update(payload).eq('id', id).select('id').maybeSingle()
+}
+
 export async function createPlace(payload) {
   return supabase.from('places').insert([payload]).select('id').single()
 }
@@ -56,9 +60,17 @@ export async function createHistoricalLayer(payload) {
   return supabase.from('place_historical_layers').insert([payload]).select('*').single()
 }
 
+export async function updateHistoricalLayer(id, payload) {
+  return supabase.from('place_historical_layers').update(payload).eq('id', id).select('id').maybeSingle()
+}
+
 export async function insertLayerImage(payload) {
   const rows = Array.isArray(payload) ? payload : [payload]
   return supabase.from('place_images').insert(rows).select('*')
+}
+
+export async function deleteLayerImages(layerId) {
+  return supabase.from('place_images').delete().eq('historical_layer_id', layerId)
 }
 
 export async function fetchHistoricalPeriods() {
