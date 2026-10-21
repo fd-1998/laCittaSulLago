@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://fil-homeserver.tail827120.ts.net/api/:path*"
+    },
+    {
+      "source": "/health",
+      "destination": "https://fil-homeserver.tail827120.ts.net/health"
+    }
+  ]
+}

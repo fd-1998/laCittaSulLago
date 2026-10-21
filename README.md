@@ -1,25 +1,25 @@
 # La Città sul Lago
 
-Frontend React dell'atlante storico di Lecco.
+**La Città sul Lago** è un atlante digitale dedicato alla storia di Lecco e del suo territorio.
 
-## Configurazione API
+Il progetto raccoglie luoghi, immagini, testimonianze, podcast e materiali di ricerca per raccontare come la città e il paesaggio lecchese siano cambiati nel tempo.
 
-In produzione frontend e API sono serviti dalla stessa origine attraverso Express e Tailscale Funnel. Non è necessaria alcuna variabile nel bundle.
+## Esplora Lecco
 
-Per lo sviluppo con un'API su un'altra origine, impostare:
+La mappa interattiva permette di:
 
-```sh
-VITE_API_URL=http://127.0.0.1:13000
-```
+- scoprire i luoghi di interesse storico;
+- esplorare le diverse fasi della loro storia;
+- consultare fotografie e descrizioni;
+- ascoltare gli episodi del podcast collegati al territorio;
+- seguire i cambiamenti della città attraverso una cronologia storica.
 
-L'API deve includere esplicitamente l'origine di sviluppo in `ALLOWED_ORIGINS`. Nessuna password o chiave amministrativa deve essere inserita nelle variabili `VITE_*`.
+## Un archivio in continua crescita
 
-## Comandi
+La Città sul Lago nasce come progetto aperto e in evoluzione. I contenuti vengono ampliati e aggiornati grazie al lavoro di ricerca e alla collaborazione di chi contribuisce alla ricostruzione della memoria locale.
 
-```sh
-npm install
-npm run lint
-npm run build
-```
+L'obiettivo è rendere la storia di Lecco accessibile, navigabile e vicina tanto a chi vive la città quanto a chi desidera conoscerla.
 
-Le rotte `/database` e `/add-location` richiedono un collaboratore autenticato; `/admin/users` richiede il ruolo admin. Ogni utente autenticato può cambiare la propria password in `/account`.
+## Visita il sito
+
+[Apri La Città sul Lago](https://la-citta-sul-lago.vercel.app/)
