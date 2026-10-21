@@ -1,11 +1,13 @@
 import { NavLink } from 'react-router-dom'
 import { useTimeline } from '../context/TimelineContext'
+import { useAuth } from '../context/AuthContext'
 
 const linkBase =
   'rounded-full px-4 py-2 text-sm font-medium transition hover:bg-slate-800/80 hover:text-white'
 
 function Navbar({ variant = 'sticky' }) {
   const { selectedYear, selectedLabel, formatTimelineYear, timelineEnabled } = useTimeline()
+  const { user, canEdit, isAdmin, logout } = useAuth()
 
   if (variant === 'overlay') {
     // overlay variant is unused; render nothing special here because MobileMenu is mounted globally
@@ -60,14 +62,50 @@ function Navbar({ variant = 'sticky' }) {
           >
             Note
           </NavLink> */}
-          <NavLink
-            to="/database"
-            className={({ isActive }) =>
-              `${linkBase} ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
-            }
-          >
-            Database
-          </NavLink>
+          {canEdit ? (
+            <NavLink
+              to="/database"
+              className={({ isActive }) =>
+                `${linkBase} ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
+              }
+            >
+              Database
+            </NavLink>
+          ) : null}
+          {isAdmin ? (
+            <NavLink
+              to="/admin/users"
+              className={({ isActive }) =>
+                `${linkBase} ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
+              }
+            >
+              Collaboratori
+            </NavLink>
+          ) : null}
+          {user ? (
+            <>
+              <NavLink
+                to="/account"
+                className={({ isActive }) =>
+                  `${linkBase} ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
+                }
+              >
+                {user.username}
+              </NavLink>
+              <button type="button" className={`${linkBase} text-slate-300`} onClick={logout}>
+                Esci
+              </button>
+            </>
+          ) : (
+            <NavLink
+              to="/login"
+              className={({ isActive }) =>
+                `${linkBase} ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
+              }
+            >
+              Accedi
+            </NavLink>
+          )}
           {timelineEnabled ? (
             <div className="ml-2 rounded-full border border-slate-800 bg-slate-900/90 px-4 py-2 text-right text-xs text-slate-300 shadow-sm">
               <p className="font-semibold text-white">{formatTimelineYear(selectedYear)}</p>

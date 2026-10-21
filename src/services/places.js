@@ -1,82 +1,53 @@
-import { supabase } from '../lib/supabase'
+import { apiRequest } from '../lib/api'
 
-const PLACE_SELECT = `
-  id,
-  canonical_name,
-  latitude,
-  longitude,
-  visited,
-  created_at,
-  place_historical_layers (
-    id,
-    place_id,
-    historical_period_id,
-    title,
-    short_description,
-    long_description,
-    start_year,
-    end_year,
-    marker_color,
-    marker_icon,
-    created_at,
-    historical_periods ( id, name, start_year, end_year, color ),
-    place_images ( id, image_url, thumbnail_url, caption, is_primary, historical_layer_id ),
-    place_podcast_episodes ( podcast_episodes ( id, title, short_description, spotify_url, youtube_url, cover_image, published_at ) ),
-    notes ( id, title, subtitle, content, date_reference, created_at )
-  ),
-  place_tags ( tags ( id, name ) )
-`
+async function result(request) {
+  try {
+    return { data: await request, error: null }
+  } catch (error) {
+    return { data: null, error }
+  }
+}
 
 export async function fetchPlaces() {
-  return supabase
-    .from('places')
-    .select(PLACE_SELECT)
-    .order('canonical_name', { ascending: true })
-    .order('start_year', { ascending: true, foreignTable: 'place_historical_layers' })
+  return result(apiRequest('/places'))
 }
 
 export async function fetchPlaceById(id) {
-  return supabase
-    .from('places')
-    .select(PLACE_SELECT)
-    .eq('id', id)
-    .order('start_year', { ascending: true, foreignTable: 'place_historical_layers' })
-    .single()
+  return result(apiRequest(`/places/${encodeURIComponent(id)}`))
 }
 
 export async function updatePlaceVisited(id, visited) {
-  return supabase.from('places').update({ visited }).eq('id', id).select(PLACE_SELECT).single()
+  return result(apiRequest(`/places/${encodeURIComponent(id)}`, { method: 'PATCH', body: { visited } }))
 }
 
 export async function updatePlace(id, payload) {
-  return supabase.from('places').update(payload).eq('id', id).select('id').maybeSingle()
+  return result(apiRequest(`/places/${encodeURIComponent(id)}`, { method: 'PATCH', body: payload }))
 }
 
 export async function createPlace(payload) {
-  return supabase.from('places').insert([payload]).select('id').single()
+  return result(apiRequest('/places', { method: 'POST', body: payload }))
 }
 
 export async function createHistoricalLayer(payload) {
-  return supabase.from('place_historical_layers').insert([payload]).select('*').single()
+  return result(apiRequest('/historical-layers', { method: 'POST', body: payload }))
 }
 
 export async function updateHistoricalLayer(id, payload) {
-  return supabase.from('place_historical_layers').update(payload).eq('id', id).select('id').maybeSingle()
+  return result(apiRequest(`/historical-layers/${encodeURIComponent(id)}`, { method: 'PATCH', body: payload }))
 }
 
 export async function insertLayerImage(payload) {
-  const rows = Array.isArray(payload) ? payload : [payload]
-  return supabase.from('place_images').insert(rows).select('*')
+  return result(apiRequest('/images', { method: 'POST', body: payload }))
 }
 
 export async function deleteLayerImages(layerId) {
-  return supabase.from('place_images').delete().eq('historical_layer_id', layerId)
+  return result(apiRequest(`/historical-layers/${encodeURIComponent(layerId)}/images`, { method: 'DELETE' }))
 }
 
 export async function fetchHistoricalPeriods() {
-  return supabase.from('historical_periods').select('*').order('start_year', { ascending: true })
+  return result(apiRequest('/historical-periods'))
 }
 
 export async function createHistoricalPeriod(payload) {
-  return supabase.from('historical_periods').insert([payload]).select('*').single()
+  return result(apiRequest('/historical-periods', { method: 'POST', body: payload }))
 }

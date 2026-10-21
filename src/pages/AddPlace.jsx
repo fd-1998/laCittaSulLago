@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import CoordinatePicker from '../components/CoordinatePicker'
 import ImageUploader from '../components/ImageUploader'
-import { supabase } from '../lib/supabase'
+import { uploadPlaceImage } from '../lib/api'
 import {
   createHistoricalLayer,
   createHistoricalPeriod,
@@ -242,7 +242,7 @@ function AddPlace() {
       return
     }
 
-    let parsedUrl = null
+    let parsedUrl
     try {
       parsedUrl = new URL(trimmed)
     } catch {
@@ -458,36 +458,21 @@ function AddPlace() {
 
       if (fileImages.length) {
         const uploadResults = await Promise.all(
-          fileImages.map(async (image, index) => {
-            const safeFileName = image.file.name.replace(/[^a-z0-9._-]/gi, '_')
-            const filePath = `public/${placeData.id}/${Date.now()}-${index}-${safeFileName}`
-            const { data: uploadData, error: uploadError } = await supabase.storage
-              .from('places')
-              .upload(filePath, image.file, {
-                upsert: false,
-                cacheControl: '3600',
-                contentType: image.file.type,
-              })
-
-            if (uploadError) {
+          fileImages.map(async (image) => {
+            try {
+              const uploaded = await uploadPlaceImage(image.file, placeData.id)
+              return {
+                status: 'fulfilled',
+                payload: {
+                  historical_layer_id: layerData.id,
+                  image_url: uploaded.publicUrl,
+                  thumbnail_url: uploaded.publicUrl,
+                  caption: image.file.name,
+                  is_primary: image.isPrimary,
+                },
+              }
+            } catch (uploadError) {
               return { status: 'rejected', error: uploadError }
-            }
-
-            const publicPath = uploadData?.path ?? filePath
-            const { data: publicData } = supabase.storage.from('places').getPublicUrl(publicPath)
-            if (!publicData?.publicUrl) {
-              return { status: 'rejected', error: new Error('URL pubblico non disponibile') }
-            }
-
-            return {
-              status: 'fulfilled',
-              payload: {
-                historical_layer_id: layerData.id,
-                image_url: publicData?.publicUrl,
-                thumbnail_url: publicData?.publicUrl,
-                caption: image.file.name,
-                is_primary: image.isPrimary,
-              },
             }
           })
         )

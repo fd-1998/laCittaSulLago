@@ -44,6 +44,8 @@ function PlaceDetail() {
 
   useEffect(() => {
     if (location.state?.layerId) {
+      // Synchronize a layer selected before navigation.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedLayerId(location.state.layerId)
     }
   }, [location.state])

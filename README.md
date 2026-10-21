@@ -1,16 +1,25 @@
-# React + Vite
+# La Città sul Lago
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend React dell'atlante storico di Lecco.
 
-Currently, two official plugins are available:
+## Configurazione API
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+In produzione frontend e API sono serviti dalla stessa origine attraverso Express e Tailscale Funnel. Non è necessaria alcuna variabile nel bundle.
 
-## React Compiler
+Per lo sviluppo con un'API su un'altra origine, impostare:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```sh
+VITE_API_URL=http://127.0.0.1:13000
+```
 
-## Expanding the ESLint configuration
+L'API deve includere esplicitamente l'origine di sviluppo in `ALLOWED_ORIGINS`. Nessuna password o chiave amministrativa deve essere inserita nelle variabili `VITE_*`.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Comandi
+
+```sh
+npm install
+npm run lint
+npm run build
+```
+
+Le rotte `/database` e `/add-location` richiedono un collaboratore autenticato; `/admin/users` richiede il ruolo admin. Ogni utente autenticato può cambiare la propria password in `/account`.

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { uploadPlaceImage } from '../lib/api'
+import { useAuth } from '../context/AuthContext'
 import CoordinatePicker from './CoordinatePicker'
 import ImageUploader from './ImageUploader'
 import { AddIcon, CloseIcon, TimelineIcon } from './UiIcons'
@@ -130,36 +131,21 @@ async function uploadImages({ images, layerId, placeId }) {
 
   if (fileImages.length) {
     const uploadResults = await Promise.all(
-      fileImages.map(async (image, index) => {
-        const safeFileName = image.file.name.replace(/[^a-z0-9._-]/gi, '_')
-        const filePath = `public/${placeId}/${Date.now()}-${index}-${safeFileName}`
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('places')
-          .upload(filePath, image.file, {
-            upsert: false,
-            cacheControl: '3600',
-            contentType: image.file.type,
-          })
-
-        if (uploadError) {
+      fileImages.map(async (image) => {
+        try {
+          const uploaded = await uploadPlaceImage(image.file, placeId)
+          return {
+            status: 'fulfilled',
+            payload: {
+              historical_layer_id: layerId,
+              image_url: uploaded.publicUrl,
+              thumbnail_url: uploaded.publicUrl,
+              caption: image.caption || image.file.name,
+              is_primary: image.isPrimary,
+            },
+          }
+        } catch (uploadError) {
           return { status: 'rejected', error: uploadError }
-        }
-
-        const publicPath = uploadData?.path ?? filePath
-        const { data: publicData } = supabase.storage.from('places').getPublicUrl(publicPath)
-        if (!publicData?.publicUrl) {
-          return { status: 'rejected', error: new Error('URL pubblico non disponibile') }
-        }
-
-        return {
-          status: 'fulfilled',
-          payload: {
-            historical_layer_id: layerId,
-            image_url: publicData.publicUrl,
-            thumbnail_url: publicData.publicUrl,
-            caption: image.caption || image.file.name,
-            is_primary: image.isPrimary,
-          },
         }
       }),
     )
@@ -184,6 +170,7 @@ function LayerSection({
   isActive,
   onSelectLayer,
   onPlaceUpdated,
+  canEdit,
 }) {
   const [isEditing, setIsEditing] = useState(false)
   const [form, setForm] = useState(() => buildLayerForm(layer))
@@ -212,6 +199,8 @@ function LayerSection({
 
   useEffect(() => {
     if (!isEditing) {
+      // Reset the draft when the selected layer changes.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm(buildLayerForm(layer))
       setEditImages(mapExistingImages(layer))
     }
@@ -297,7 +286,7 @@ function LayerSection({
       return
     }
 
-    let parsedUrl = null
+    let parsedUrl
     try {
       parsedUrl = new URL(trimmed)
     } catch {
@@ -450,13 +439,15 @@ function LayerSection({
           >
             Mostra sulla mappa
           </button>
-          <button
-            type="button"
-            onClick={isEditing ? cancelEdit : () => setIsEditing(true)}
-            className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 px-3 py-2 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-400/10"
-          >
-            {isEditing ? 'Annulla' : 'Modifica'}
-          </button>
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={isEditing ? cancelEdit : () => setIsEditing(true)}
+              className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 px-3 py-2 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-400/10"
+            >
+              {isEditing ? 'Annulla' : 'Modifica'}
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -682,6 +673,7 @@ function PlaceDrawer({
   onToggleVisited,
   onPlaceUpdated,
 }) {
+  const { canEdit } = useAuth()
   const [isEditingPlace, setIsEditingPlace] = useState(false)
   const [placeForm, setPlaceForm] = useState({
     canonical_name: place?.canonical_name ?? '',
@@ -726,6 +718,8 @@ function PlaceDrawer({
   }, [place])
 
   useEffect(() => {
+    // Reset the place draft when the drawer receives another place.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPlaceForm({
       canonical_name: place?.canonical_name ?? '',
       latitude: place?.latitude ?? '',
@@ -840,7 +834,7 @@ function PlaceDrawer({
       return
     }
 
-    let parsedUrl = null
+    let parsedUrl
     try {
       parsedUrl = new URL(trimmed)
     } catch {
@@ -1036,15 +1030,16 @@ function PlaceDrawer({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/70">Dati luogo</p>
-              <p className="mt-2 text-sm text-slate-300">Coordinate e nome canonico</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsEditingPlace((current) => !current)}
-              className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 px-3 py-2 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-400/10"
-            >
-              {isEditingPlace ? 'Annulla' : 'Modifica'}
-            </button>
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={() => setIsEditingPlace((current) => !current)}
+                className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 px-3 py-2 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-400/10"
+              >
+                {isEditingPlace ? 'Annulla' : 'Modifica'}
+              </button>
+            ) : null}
           </div>
 
           {isEditingPlace ? (
@@ -1128,7 +1123,7 @@ function PlaceDrawer({
             </div>
           ) : null}
 
-          <div className="mt-4 flex flex-wrap items-center gap-3">
+          {canEdit ? <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
               className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 px-4 py-2 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-400/10"
               type="button"
@@ -1137,15 +1132,12 @@ function PlaceDrawer({
               <TimelineIcon className="h-4 w-4" />
               {place.visited ? 'Visitato' : 'Non visitato'}
             </button>
-          </div>
+          </div> : null}
         </section>
 
         <section className="space-y-5">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/70">Livelli storici</p>
-            <p className="mt-1 text-sm text-slate-400">
-              Ogni epoca è separata e modificabile singolarmente.
-            </p>
           </div>
           <div className="space-y-6">
             {layers.map((layer) => (
@@ -1157,17 +1149,18 @@ function PlaceDrawer({
                 isActive={activeLayer?.id === layer.id}
                 onSelectLayer={onSelectLayer}
                 onPlaceUpdated={onPlaceUpdated}
+                canEdit={canEdit}
               />
             ))}
           </div>
         </section>
 
-        <section className="rounded-3xl border border-slate-800/80 bg-slate-950/80 p-5 shadow-lg">
+        {canEdit ? <section className="rounded-3xl border border-slate-800/80 bg-slate-950/80 p-5 shadow-lg">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/70">Nuovo livello storico</p>
               <p className="mt-1 text-xs text-slate-400">
-                Aggiungi un periodo storico aggiuntivo per questo luogo.
+                Aggiungi un periodo storico per questo luogo.
               </p>
             </div>
             <button
@@ -1311,7 +1304,7 @@ function PlaceDrawer({
               </button>
             </div>
           ) : null}
-        </section>
+        </section> : null}
       </div>
     </aside>
   )

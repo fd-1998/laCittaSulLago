@@ -7,27 +7,22 @@ import {
   AddIcon,
   CloseIcon,
   FilterIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  HomeIcon,
   LayersIcon,
-  NotesIcon,
-  PodcastsIcon,
-  TimelineIcon,
 } from '../components/UiIcons'
 import { getActiveLayersForPlace, getDefaultLayerForPlace, useTimeline } from '../context/TimelineContext'
 import usePlacesData from '../hooks/usePlacesData'
 import { updatePlaceVisited } from '../services/places'
-import SiteLogo from '../assets/logo.png'
+import { useAuth } from '../context/AuthContext'
 
 
 function HomeMap() {
+  const { canEdit } = useAuth()
   const { selectedYear, timelineEnabled } = useTimeline()
-  const { places, setPlaces, periods, loading, error } = usePlacesData()
+  const { places, setPlaces, periods } = usePlacesData()
   const [selectedPlace, setSelectedPlace] = useState(null)
   const [selectedLayerByPlaceId, setSelectedLayerByPlaceId] = useState({})
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false)
-  const [isDesktopFiltersOpen, setIsDesktopFiltersOpen] = useState(true)
+  const [isDesktopFiltersOpen] = useState(true)
   const [selectedPeriodId, setSelectedPeriodId] = useState('all')
   const drawerDragStartRef = useRef(null)
   const drawerDragActiveRef = useRef(false)
@@ -96,6 +91,8 @@ function HomeMap() {
 
     const stillVisible = filteredPlaces.some((entry) => entry.place.id === selectedPlace.id)
     if (!stillVisible) {
+      // Keep drawer selection consistent with active filters.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedPlace(null)
     }
   }, [filteredPlaces, selectedPlace])
@@ -271,13 +268,13 @@ function HomeMap() {
             />
           </div>
 
-          <Link
+          {canEdit ? <Link
             to="/add-location"
             className="fixed bottom-8 right-6 z-[2600] inline-flex items-center gap-2 rounded-full bg-cyan-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-2xl transition hover:bg-cyan-300 lg:px-5"
           >
             <AddIcon className="h-4 w-4" />
             <span className="hidden lg:inline">Aggiungi luogo</span>
-          </Link>
+          </Link> : null}
 
           {selectedPlace ? (
             <button

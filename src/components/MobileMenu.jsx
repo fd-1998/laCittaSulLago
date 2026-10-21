@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import {
   AddIcon,
   HomeIcon,
@@ -11,17 +12,24 @@ import {
   CloseIcon,
 } from './UiIcons'
 
-const mobileLinks = [
+const publicLinks = [
   { to: '/', label: 'Mappa', icon: HomeIcon },
   { to: '/timeline', label: 'Cronologia', icon: TimelineIcon },
   { to: '/podcasts', label: 'Podcast', icon: PodcastsIcon },
   { to: '/notes', label: 'Note', icon: NotesIcon },
-  { to: '/database', label: 'Database', icon: DatabaseIcon },
-  { to: '/add-location', label: 'Aggiungi', icon: AddIcon },
 ]
 
 export default function MobileMenu() {
   const [isOpen, setIsOpen] = useState(false)
+  const { user, canEdit, isAdmin, logout } = useAuth()
+  const mobileLinks = [
+    ...publicLinks,
+    ...(canEdit ? [
+      { to: '/database', label: 'Database', icon: DatabaseIcon },
+      { to: '/add-location', label: 'Aggiungi', icon: AddIcon },
+    ] : []),
+    ...(isAdmin ? [{ to: '/admin/users', label: 'Collaboratori', icon: DatabaseIcon }] : []),
+  ]
 
   return (
     <>
@@ -65,6 +73,35 @@ export default function MobileMenu() {
               <span>{label}</span>
             </Link>
           ))}
+          {user ? (
+            <>
+              <Link
+                to="/account"
+                className="rounded-2xl border border-slate-800 px-4 py-3 text-sm font-medium text-slate-200"
+                onClick={() => setIsOpen(false)}
+              >
+                Account
+              </Link>
+              <button
+                type="button"
+                className="rounded-2xl border border-slate-800 px-4 py-3 text-left text-sm font-medium text-slate-200"
+                onClick={async () => {
+                  await logout()
+                  setIsOpen(false)
+                }}
+              >
+                Esci
+              </button>
+            </>
+          ) : (
+            <Link
+              to="/login"
+              className="rounded-2xl border border-slate-800 px-4 py-3 text-sm font-medium text-slate-200"
+              onClick={() => setIsOpen(false)}
+            >
+              Accedi
+            </Link>
+          )}
         </nav>
       </aside>
     </>

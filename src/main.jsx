@@ -4,13 +4,16 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
 import { TimelineProvider } from './context/TimelineContext'
+import { AuthProvider } from './context/AuthContext'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
-      <TimelineProvider>
-        <App />
-      </TimelineProvider>
+      <AuthProvider>
+        <TimelineProvider>
+          <App />
+        </TimelineProvider>
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
 )

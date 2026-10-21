@@ -1,8 +1,9 @@
-import { supabase } from '../lib/supabase'
+import { apiRequest } from '../lib/api'
 
 export async function fetchPodcastEpisodes() {
-  return supabase
-    .from('podcast_episodes')
-    .select('*')
-    .order('published_at', { ascending: false })
+  try {
+    return { data: await apiRequest('/podcast-episodes'), error: null }
+  } catch (error) {
+    return { data: null, error }
+  }
 }

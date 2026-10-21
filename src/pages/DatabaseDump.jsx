@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { fetchEditorTable, updateEditorRow } from '../lib/api'
 import { SearchIcon } from '../components/UiIcons'
 
 const TABLES = [
@@ -83,9 +83,9 @@ const TABLES = [
     name: 'place_podcast_episodes',
     label: 'Relazioni luogo/podcast',
     description: 'Connessioni tra layer e episodi.',
-    primaryKeys: ['id'],
-    readOnly: ['id', 'created_at'],
-    columns: ['id', 'historical_layer_id', 'podcast_episode_id', 'created_at'],
+    primaryKeys: ['place_id', 'episode_id'],
+    readOnly: ['place_id', 'episode_id'],
+    columns: ['place_id', 'episode_id', 'historical_layer_id'],
     order: { column: 'historical_layer_id', ascending: true },
   },
   {
@@ -94,7 +94,7 @@ const TABLES = [
     description: 'Categorie per l’archivio di ricerca.',
     primaryKeys: ['id'],
     readOnly: ['id', 'created_at'],
-    columns: ['id', 'name', 'created_at'],
+    columns: ['id', 'name', 'description', 'created_at'],
     order: { column: 'name', ascending: true },
   },
   {
@@ -129,9 +129,9 @@ const TABLES = [
     name: 'place_tags',
     label: 'Relazioni luogo/tag',
     description: 'Collegamenti tra luoghi e tag.',
-    primaryKeys: ['id'],
-    readOnly: ['id', 'created_at'],
-    columns: ['id', 'place_id', 'tag_id', 'created_at'],
+    primaryKeys: ['place_id', 'tag_id'],
+    readOnly: ['place_id', 'tag_id'],
+    columns: ['place_id', 'tag_id'],
     order: { column: 'place_id', ascending: true },
   },
 ]
@@ -150,13 +150,7 @@ const NUMBER_FIELDS = new Set([
   'longitude',
   'start_year',
   'end_year',
-  'place_id',
-  'historical_period_id',
-  'historical_layer_id',
-  'note_group_id',
-  'related_place_id',
-  'tag_id',
-  'podcast_episode_id',
+  'date_reference',
 ])
 
 const formatValue = (value) => {
@@ -180,18 +174,12 @@ function DatabaseDump() {
     setLoadingByTable((prev) => ({ ...prev, [table.name]: true }))
     setErrorByTable((prev) => ({ ...prev, [table.name]: null }))
 
-    let query = supabase.from(table.name).select('*')
-    if (table.order?.column) {
-      query = query.order(table.order.column, { ascending: table.order.ascending })
-    }
-
-    const { data, error } = await query
-
-    if (error) {
+    try {
+      const data = await fetchEditorTable(table.name)
+      setDataByTable((prev) => ({ ...prev, [table.name]: data ?? [] }))
+    } catch (error) {
       setErrorByTable((prev) => ({ ...prev, [table.name]: error.message }))
       setDataByTable((prev) => ({ ...prev, [table.name]: [] }))
-    } else {
-      setDataByTable((prev) => ({ ...prev, [table.name]: data ?? [] }))
     }
 
     setLoadingByTable((prev) => ({ ...prev, [table.name]: false }))
@@ -255,15 +243,8 @@ function DatabaseDump() {
       }))
 
       const payload = buildPayload(table, row)
-      const { data, error } = await supabase.from(table.name).update(payload).match(match).select('*')
-
-      if (error) {
-        setStatusRows((prev) => ({
-          ...prev,
-          [table.name]: { ...prev[table.name], [rowKey]: error.message },
-        }))
-      } else {
-        const updatedRow = Array.isArray(data) ? data[0] : data
+      try {
+        const updatedRow = await updateEditorRow(table.name, match, payload)
         setDataByTable((prev) => {
           const rows = prev[table.name] ?? []
           const nextRows = rows.map((item) =>
@@ -279,6 +260,11 @@ function DatabaseDump() {
         setStatusRows((prev) => ({
           ...prev,
           [table.name]: { ...prev[table.name], [rowKey]: 'Salvato' },
+        }))
+      } catch (error) {
+        setStatusRows((prev) => ({
+          ...prev,
+          [table.name]: { ...prev[table.name], [rowKey]: error.message },
         }))
       }
 
