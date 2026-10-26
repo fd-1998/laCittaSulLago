@@ -29,6 +29,7 @@ function Map({ markers = [], onSelectPlace, activePlaceId }) {
       zoom: 11,
       zoomControl: false,
     })
+    L.control.zoom({ position: 'bottomright' }).addTo(map)
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
@@ -125,10 +126,10 @@ function Map({ markers = [], onSelectPlace, activePlaceId }) {
               : ''
           }
           <h3 style="margin: 0 0 4px; font-size: 15px;">${place.canonical_name ?? 'Luogo senza titolo'}</h3>
-          <p style="margin: 0 0 6px; font-size: 12px; color: #94a3b8;">${
+          <p style="margin: 0 0 6px; font-size: 12px; color: rgba(21, 57, 77, 0.65);">${
             period?.name ?? 'Periodo storico'
           }</p>
-          <p style="margin: 0; font-size: 12px; line-height: 1.45; color: #cbd5f5;">${
+          <p style="margin: 0; font-size: 12px; line-height: 1.45; color: rgba(21, 57, 77, 0.82);">${
             (layer.short_description ?? '').slice(0, 120)
           }</p>
         </div>
@@ -136,8 +137,8 @@ function Map({ markers = [], onSelectPlace, activePlaceId }) {
 
       const marker = L.circleMarker([place.latitude, place.longitude], {
         radius: activePlaceId === place.id ? 10 : 7,
-        color: isVisited ? '#22d3ee' : periodColor,
-        fillColor: isVisited ? '#22d3ee' : periodColor,
+        color: isVisited ? '#5C7E6B' : periodColor,
+        fillColor: isVisited ? '#5C7E6B' : periodColor,
         fillOpacity: isVisited ? 0.75 : 0.6,
         weight: 2,
       })

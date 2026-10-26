@@ -44,10 +44,28 @@ export async function deleteLayerImages(layerId) {
   return result(apiRequest(`/historical-layers/${encodeURIComponent(layerId)}/images`, { method: 'DELETE' }))
 }
 
+export async function replaceLayerImages(layerId, payload) {
+  return result(apiRequest(`/historical-layers/${encodeURIComponent(layerId)}/images`, {
+    method: 'PUT',
+    body: payload,
+  }))
+}
+
 export async function fetchHistoricalPeriods() {
   return result(apiRequest('/historical-periods'))
 }
 
 export async function createHistoricalPeriod(payload) {
   return result(apiRequest('/historical-periods', { method: 'POST', body: payload }))
+}
+
+export async function fetchTags() {
+  return result(apiRequest('/tags'))
+}
+
+export async function updatePlaceTags(placeId, tagIds) {
+  return result(apiRequest(`/places/${encodeURIComponent(placeId)}/tags`, {
+    method: 'PUT',
+    body: { tagIds },
+  }))
 }

@@ -31,7 +31,7 @@ function Navbar({ variant = 'sticky' }) {
 
         <nav className="hidden flex-wrap items-center justify-end gap-2 lg:flex">
           <NavLink
-            to="/"
+            to="/mappa"
             className={({ isActive }) =>
               `${linkBase} ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
             }

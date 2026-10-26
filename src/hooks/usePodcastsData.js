@@ -1,23 +1,22 @@
 import { useCallback, useEffect, useState } from 'react'
-import { fetchPodcastEpisodes } from '../services/podcasts'
+import { fetchPodcastFeed } from '../lib/podcastFeed'
 
 export default function usePodcastsData() {
-  const [episodes, setEpisodes] = useState([])
+  const [podcast, setPodcast] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const loadEpisodes = useCallback(async () => {
+  const loadEpisodes = useCallback(async (signal) => {
     setLoading(true)
     setError('')
 
     try {
-      const { data, error: supabaseError } = await fetchPodcastEpisodes()
-      if (supabaseError) {
-        throw supabaseError
-      }
-
-      setEpisodes(data ?? [])
+      const feed = await fetchPodcastFeed(signal)
+      setPodcast(feed)
     } catch (loadError) {
+      if (loadError.name === 'AbortError') {
+        return
+      }
       setError(loadError.message || 'Impossibile caricare gli episodi podcast.')
     } finally {
       setLoading(false)
@@ -25,10 +24,12 @@ export default function usePodcastsData() {
   }, [])
 
   useEffect(() => {
+    const controller = new AbortController()
     void (async () => {
-      await loadEpisodes()
+      await loadEpisodes(controller.signal)
     })()
+    return () => controller.abort()
   }, [loadEpisodes])
 
-  return { episodes, loading, error, reload: loadEpisodes }
+  return { podcast, episodes: podcast?.episodes ?? [], loading, error, reload: loadEpisodes }
 }

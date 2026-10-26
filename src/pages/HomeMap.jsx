@@ -1,456 +1,337 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  Building2,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  MapPin,
+  Plus,
+  Search,
+  Sparkles,
+  X,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Map from '../components/Map'
 import PlaceDrawer from '../components/PlaceDrawer'
 import TimelineSlider from '../components/TimelineSlider'
-import {
-  AddIcon,
-  CloseIcon,
-  FilterIcon,
-  LayersIcon,
-} from '../components/UiIcons'
 import { getActiveLayersForPlace, getDefaultLayerForPlace, useTimeline } from '../context/TimelineContext'
 import usePlacesData from '../hooks/usePlacesData'
-import { updatePlaceVisited } from '../services/places'
 import { useAuth } from '../context/AuthContext'
+import { updatePlaceVisited } from '../services/places'
 
+const itineraries = [
+  {
+    id: 'architecture',
+    label: 'Itinerario architettonico',
+    shortLabel: 'Architettura',
+    icon: Building2,
+  },
+  {
+    id: 'manzoni',
+    label: 'Itinerario manzoniano',
+    shortLabel: 'Manzoni',
+    icon: Sparkles,
+  },
+]
+
+function normalize(value) {
+  return value?.toLocaleLowerCase('it-IT').trim() ?? ''
+}
+
+function ResultCover({ image }) {
+  const [failed, setFailed] = useState(false)
+  if (!image || failed) {
+    return <span className="gis-result-placeholder"><MapPin /></span>
+  }
+  return <img src={image.thumbnail_url || image.image_url} alt="" onError={() => setFailed(true)} />
+}
 
 function HomeMap() {
   const { canEdit } = useAuth()
   const { selectedYear, timelineEnabled } = useTimeline()
-  const { places, setPlaces, periods } = usePlacesData()
+  const { places, setPlaces, periods, loading, error, reload } = usePlacesData()
   const [selectedPlace, setSelectedPlace] = useState(null)
   const [selectedLayerByPlaceId, setSelectedLayerByPlaceId] = useState({})
-  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false)
-  const [isDesktopFiltersOpen] = useState(true)
   const [selectedPeriodId, setSelectedPeriodId] = useState('all')
-  const drawerDragStartRef = useRef(null)
-  const drawerDragActiveRef = useRef(false)
+  const [selectedItinerary, setSelectedItinerary] = useState('all')
+  const [query, setQuery] = useState('')
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-
     return () => {
       document.body.style.overflow = previousOverflow
     }
   }, [])
 
-  const resolvedPlaces = useMemo(() => {
-    return places
-      .map((place) => {
-        const activeLayers = timelineEnabled
-          ? getActiveLayersForPlace(place, selectedYear)
-          : [getDefaultLayerForPlace(place)].filter(Boolean)
+  const resolvedPlaces = useMemo(() => places.map((place) => {
+    const activeLayers = timelineEnabled
+      ? getActiveLayersForPlace(place, selectedYear)
+      : [getDefaultLayerForPlace(place)].filter(Boolean)
+    if (!activeLayers.length) return null
 
-        if (!activeLayers.length) {
-          return null
-        }
-
-        const selectedLayerId = selectedLayerByPlaceId[place.id]
-        const activeLayer =
-          activeLayers.find((layer) => layer.id === selectedLayerId) ?? activeLayers[0]
-
-        return {
-          place,
-          activeLayers,
-          activeLayer,
-        }
-      })
-      .filter(Boolean)
-  }, [places, selectedYear, selectedLayerByPlaceId, timelineEnabled])
+    const selectedLayerId = selectedLayerByPlaceId[place.id]
+    const activeLayer = activeLayers.find((layer) => layer.id === selectedLayerId) ?? activeLayers[0]
+    return { place, activeLayers, activeLayer }
+  }).filter(Boolean), [places, selectedLayerByPlaceId, selectedYear, timelineEnabled])
 
   const filteredPlaces = useMemo(() => {
-    return resolvedPlaces.filter(({ activeLayers, activeLayer }) => {
-      if (selectedPeriodId === 'all') {
-        return true
+    const normalizedQuery = normalize(query)
+    const itinerary = itineraries.find((item) => item.id === selectedItinerary)
+
+    return resolvedPlaces.filter(({ place, activeLayer, activeLayers }) => {
+      if (selectedPeriodId !== 'all') {
+        const periodMatches = activeLayers.some(
+          (layer) => String(layer.historical_period_id) === String(selectedPeriodId),
+        )
+        if (!periodMatches) return false
       }
 
-      const periodId = String(selectedPeriodId)
-      return (
-        activeLayer?.historical_period_id != null &&
-        String(activeLayer.historical_period_id) === periodId
-      ) || activeLayers.some((layer) => String(layer.historical_period_id) === periodId)
+      if (itinerary) {
+        const tagMatches = place.place_tags?.some(
+          (entry) => normalize(entry.tags?.name) === normalize(itinerary.label),
+        )
+        if (!tagMatches) return false
+      }
+
+      if (normalizedQuery) {
+        const haystack = [
+          place.canonical_name,
+          activeLayer.title,
+          activeLayer.short_description,
+          activeLayer.long_description,
+        ].map(normalize).join(' ')
+        if (!haystack.includes(normalizedQuery)) return false
+      }
+
+      return true
     })
-  }, [resolvedPlaces, selectedPeriodId])
+  }, [query, resolvedPlaces, selectedItinerary, selectedPeriodId])
 
-  const markers = useMemo(
-    () =>
-      filteredPlaces.map((entry) => ({
-        place: entry.place,
-        layer: entry.activeLayer,
-        activeLayers: entry.activeLayers,
-      })),
-    [filteredPlaces],
-  )
+  const markers = useMemo(() => filteredPlaces.map((entry) => ({
+    place: entry.place,
+    layer: entry.activeLayer,
+    activeLayers: entry.activeLayers,
+  })), [filteredPlaces])
 
-  useEffect(() => {
-    if (!selectedPlace) {
-      return
-    }
+  const itineraryCounts = useMemo(() => Object.fromEntries(
+    itineraries.map((itinerary) => [
+      itinerary.id,
+      resolvedPlaces.filter(({ place }) => place.place_tags?.some(
+        (entry) => normalize(entry.tags?.name) === normalize(itinerary.label),
+      )).length,
+    ]),
+  ), [resolvedPlaces])
 
-    const stillVisible = filteredPlaces.some((entry) => entry.place.id === selectedPlace.id)
-    if (!stillVisible) {
-      // Keep drawer selection consistent with active filters.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSelectedPlace(null)
-    }
-  }, [filteredPlaces, selectedPlace])
-
-  const handleToggleVisited = async () => {
-    if (!selectedPlace) {
-      return
-    }
-
-    const { data, error: supabaseError } = await updatePlaceVisited(
-      selectedPlace.id,
-      !selectedPlace.visited,
-    )
-
-    if (supabaseError) {
-      return
-    }
-
-    setPlaces((current) =>
-      current.map((place) => (place.id === data.id ? { ...place, visited: data.visited } : place)),
-    )
-    setSelectedPlace((current) => (current ? { ...current, visited: data.visited } : current))
-  }
-
-  const handlePlaceUpdated = (updatedPlace) => {
-    setPlaces((current) =>
-      current.map((place) => (place.id === updatedPlace.id ? updatedPlace : place)),
-    )
-
-    setSelectedPlace((current) => (current?.id === updatedPlace.id ? updatedPlace : current))
-  }
-
-  const handleMobileDrawerPointerDown = (event) => {
-    drawerDragActiveRef.current = true
-    drawerDragStartRef.current = event.clientY
-    event.currentTarget.setPointerCapture?.(event.pointerId)
-  }
-
-  const handleMobileDrawerPointerMove = (event) => {
-    if (!drawerDragActiveRef.current || drawerDragStartRef.current == null) {
-      return
-    }
-
-    const delta = event.clientY - drawerDragStartRef.current
-    if (delta > 80) {
-      drawerDragActiveRef.current = false
-      drawerDragStartRef.current = null
-      setSelectedPlace(null)
+  function selectPlace(place, layer) {
+    setSelectedPlace(place)
+    if (layer?.id) {
+      setSelectedLayerByPlaceId((current) => ({ ...current, [place.id]: layer.id }))
     }
   }
 
-  const handleMobileDrawerPointerUp = () => {
-    drawerDragActiveRef.current = false
-    drawerDragStartRef.current = null
+  async function toggleVisited() {
+    if (!selectedPlace) return
+    const { data, error: updateError } = await updatePlaceVisited(selectedPlace.id, !selectedPlace.visited)
+    if (updateError) return
+    setPlaces((current) => current.map((place) => (
+      place.id === data.id ? { ...place, visited: data.visited } : place
+    )))
+    setSelectedPlace((current) => current ? { ...current, visited: data.visited } : current)
   }
+
+  const activeEntry = filteredPlaces.find(({ place }) => place.id === selectedPlace?.id)
+    ?? resolvedPlaces.find(({ place }) => place.id === selectedPlace?.id)
 
   return (
-    <main className="relative h-[calc(100dvh-4.5rem)] w-screen overflow-hidden bg-slate-950 pt-[0]">
-      <section
-        className={`grid h-full w-full grid-cols-1 lg:transition-[grid-template-columns] ${
-          isDesktopFiltersOpen
-            ? 'lg:grid-cols-[24rem_minmax(0,1fr)]'
-            : 'lg:grid-cols-[4.75rem_minmax(0,1fr)]'
-        }`}
-      >
-        <aside className="relative z-[2500] hidden h-full flex-col border-r border-slate-800/80 bg-slate-950/80 backdrop-blur lg:flex">
-          
-
-          <div className="relative flex-1 overflow-hidden px-5 py-5">
-
-            {isDesktopFiltersOpen ? (
-              <div className="flex h-full min-h-0 flex-col gap-4">
-                <div className="rounded-3xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-lg">
-
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-400/10 text-cyan-300">
-                      <FilterIcon />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-white">Filtri</p>
-                    </div>
-                  </div>
-                    
-                  <TimelineSlider periods={periods} />
-
-                  <label className="space-y-2 rounded-3xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-lg">
-                    <span className="flex items-center gap-2 text-sm font-medium text-slate-200">
-                      <LayersIcon className="h-4 w-4 text-cyan-300" />
-                      Periodo storico
-                    </span>
-                    <select
-                      className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                      value={selectedPeriodId}
-                      onChange={(event) => setSelectedPeriodId(event.target.value)}
-                    >
-                      <option value="all">Tutti i periodi</option>
-                      {periods.map((period) => (
-                        <option key={period.id} value={period.id}>
-                          {period.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              </div>
-            ) : (
-              <div className="flex h-full items-start justify-center pt-14">
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-3 text-cyan-300 shadow-lg">
-                  <FilterIcon />
-                </div>
-              </div>
-            )}
+    <main className="gis-app">
+      <section className={`gis-sidebar ${sidebarOpen ? 'is-open' : 'is-closed'}`}>
+        <div className="gis-sidebar-heading">
+          <div>
+            <span className="gis-kicker">Atlante interattivo</span>
+            <h1>Esplora Lecco</h1>
           </div>
-        </aside>
-
-        <section className="relative h-full min-w-0">
-          {/* Mobile menu is now a shared component mounted in App */}
-
-          {/* <div className="absolute flex flex-row items-center gap-3 right-4 top-4 z-[2500] max-w-[min(18rem,calc(100vw-6rem))] rounded-3xl border border-slate-800/80 bg-slate-950/70 px-4 py-3 shadow-2xl backdrop-blur lg:hidden text-right">
-            <div className="flex-shrink-0">
-              <img src={SiteLogo} alt="Logo" className="h-10 w-10 rounded-md object-cover" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300/80">La Città sul Lago</p>
-              <h2 className="mt-1 text-xs text-white">Atlante storico di Lecco</h2>
-            </div>
-          </div> */}
-
           <button
-            aria-label="Apri filtri"
-            className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[2600] flex h-12 items-center gap-2 rounded-full border border-slate-800/80 bg-slate-950/85 px-6 text-cyan-300 shadow-2xl backdrop-blur transition hover:bg-slate-800/90 lg:hidden ${
-              isMobileFiltersOpen ? 'pointer-events-none opacity-0' : 'opacity-100'
-            }`}
             type="button"
-            onClick={() => setIsMobileFiltersOpen(true)}
+            onClick={() => setSidebarOpen((current) => !current)}
+            aria-label={sidebarOpen ? 'Chiudi pannello' : 'Apri pannello'}
           >
-            <FilterIcon className="h-5 w-5" />
-            <span className="text-sm font-semibold tracking-wide">Filtri</span>
+            {sidebarOpen ? <ChevronLeft /> : <ChevronRight />}
           </button>
-{/* 
-          <div className="absolute right-4 top-4 z-[2501] hidden items-center gap-2 rounded-full border border-slate-800/80 bg-slate-950/70 px-3 py-2 shadow-2xl backdrop-blur lg:flex">
-            {[
-              ['/', 'Mappa', HomeIcon],
-              ['/timeline', 'Cronologia', TimelineIcon],
-              ['/podcasts', 'Podcast', PodcastsIcon],
-              ['/notes', 'Note', NotesIcon],
-              ['/add-location', 'Aggiungi', AddIcon],
-            ].map(([to, label, Icon]) => (
-              <Link
-                key={to}
-                className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800/80 hover:text-white"
-                to={to}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{label}</span>
-              </Link>
-            ))}
-          </div> */}
+        </div>
 
-          <div className="h-full w-full">
-            <Map
-              markers={markers}
-              activePlaceId={selectedPlace?.id}
-              onSelectPlace={(place, layer) => {
-                setSelectedPlace(place)
-                if (layer?.id) {
-                  setSelectedLayerByPlaceId((current) => ({
-                    ...current,
-                    [place.id]: layer.id,
-                  }))
-                }
-              }}
+        <div className="gis-sidebar-content">
+          <label className="gis-search">
+            <Search aria-hidden="true" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Cerca un luogo o una storia"
             />
-          </div>
+            {query ? <button type="button" onClick={() => setQuery('')} aria-label="Cancella ricerca"><X /></button> : null}
+          </label>
 
-          {canEdit ? <Link
-            to="/add-location"
-            className="fixed bottom-8 right-6 z-[2600] inline-flex items-center gap-2 rounded-full bg-cyan-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-2xl transition hover:bg-cyan-300 lg:px-5"
-          >
-            <AddIcon className="h-4 w-4" />
-            <span className="hidden lg:inline">Aggiungi luogo</span>
-          </Link> : null}
-
-          {selectedPlace ? (
-            <button
-              className="absolute inset-0 z-[2501] hidden cursor-default lg:block"
-              type="button"
-              aria-label="Chiudi scheda luogo"
-              onClick={() => setSelectedPlace(null)}
-            />
-          ) : null}
-
-          <div className="pointer-events-none absolute inset-0 z-[2502] hidden h-full items-end justify-end p-6 lg:flex">
-            <PlaceDrawer
-              place={selectedPlace}
-              activeLayer={
-                filteredPlaces.find((entry) => entry.place.id === selectedPlace?.id)?.activeLayer
-              }
-              activeLayers={
-                filteredPlaces.find((entry) => entry.place.id === selectedPlace?.id)?.activeLayers ??
-                []
-              }
-              periods={periods}
-              onSelectLayer={(layer) => {
-                if (layer?.id && selectedPlace?.id) {
-                  setSelectedLayerByPlaceId((current) => ({
-                    ...current,
-                    [selectedPlace.id]: layer.id,
-                  }))
-                }
-              }}
-              onClose={() => setSelectedPlace(null)}
-              onToggleVisited={handleToggleVisited}
-              onPlaceUpdated={handlePlaceUpdated}
-            />
-          </div>
-        </section>
-      </section>
-
-      {/* Mobile menu is now a shared component mounted in App */}
-
-      <div
-        className={`fixed inset-x-0 bottom-0 z-[2800] lg:hidden ${
-          isMobileFiltersOpen ? 'pointer-events-auto' : 'pointer-events-none'
-        }`}
-        aria-hidden={!isMobileFiltersOpen}
-      >
-        <div
-          className={`absolute inset-0 bg-slate-950 backdrop-blur transition-opacity ${
-            isMobileFiltersOpen ? 'opacity-100' : 'opacity-0'
-          }`}
-          onClick={() => setIsMobileFiltersOpen(false)}
-          role="presentation"
-        />
-        <div
-          className={`absolute bottom-0 left-0 right-0 flex max-h-[82vh] flex-col overflow-hidden rounded-t-3xl border-t border-slate-800 bg-slate-950/95 p-5 shadow-2xl transition-transform ${
-            isMobileFiltersOpen ? 'translate-y-0' : 'translate-y-full'
-          }`}
-        >
-            <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FilterIcon className="h-4 w-4 text-cyan-300" />
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300/80">
-                Filtri
-              </p>
-            </div>
-            <button
-              aria-label="Chiudi filtri"
-              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-800 text-slate-200 transition hover:border-cyan-400/40 hover:text-white"
-              type="button"
-              onClick={() => setIsMobileFiltersOpen(false)}
-            >
-              <CloseIcon />
-            </button>
-          </div>
-
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain pb-6">
-            <TimelineSlider periods={periods} />
-
-            <label className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-              <span className="flex items-center gap-2 text-sm font-medium text-slate-200">
-                <LayersIcon className="h-4 w-4 text-cyan-300" />
-                Historical period
-              </span>
-              <select
-                className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                value={selectedPeriodId}
-                onChange={(event) => setSelectedPeriodId(event.target.value)}
-              >
-                <option value="all">All periods</option>
-                {periods.map((period) => (
-                  <option key={period.id} value={period.id}>
-                    {period.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <div className="space-y-3">
-              {filteredPlaces.map(({ place, activeLayer }) => (
+          <div className="gis-filter-group">
+            <span className="gis-filter-label">Itinerari</span>
+            <div className="gis-itinerary-grid">
+              {itineraries.map(({ id, shortLabel, icon: Icon }) => (
                 <button
-                  key={place.id}
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-left shadow-lg shadow-black/10 transition hover:border-cyan-400/40"
+                  key={id}
+                  className={selectedItinerary === id ? 'is-active' : ''}
                   type="button"
-                  onClick={() => {
-                    setSelectedPlace(place)
-                    if (activeLayer?.id) {
-                      setSelectedLayerByPlaceId((current) => ({
-                        ...current,
-                        [place.id]: activeLayer.id,
-                      }))
-                    }
-                    setIsMobileFiltersOpen(false)
-                  }}
+                  onClick={() => setSelectedItinerary((current) => current === id ? 'all' : id)}
                 >
-                  <h3 className="text-base font-semibold text-white">
-                    {activeLayer?.title ?? place.canonical_name}
-                  </h3>
-                  <p className="mt-2 text-sm text-slate-300">
-                    {activeLayer?.short_description}
-                  </p>
+                  <Icon />
+                  <span>{shortLabel}</span>
+                  <strong>{itineraryCounts[id]}</strong>
                 </button>
               ))}
             </div>
           </div>
-        </div>
-      </div>
 
-      <div
-        className={`fixed inset-x-0 bottom-0 z-[2800] lg:hidden ${selectedPlace ? 'pointer-events-auto' : 'pointer-events-none'}`}
-        aria-hidden={!selectedPlace}
-      >
-        <div
-          className={`absolute inset-0 bg-slate-950/70 backdrop-blur transition-opacity ${
-            selectedPlace ? 'opacity-100' : 'opacity-0'
-          }`}
-          onClick={() => setSelectedPlace(null)}
-          role="presentation"
+          <div className="gis-filter-group">
+            <span className="gis-filter-label">Tempo e periodo</span>
+            <TimelineSlider periods={periods} />
+            <label className="gis-period-select">
+              <span>Periodo storico</span>
+              <select value={selectedPeriodId} onChange={(event) => setSelectedPeriodId(event.target.value)}>
+                <option value="all">Tutti i periodi</option>
+                {periods.map((period) => <option key={period.id} value={period.id}>{period.name}</option>)}
+              </select>
+            </label>
+          </div>
+
+          <div className="gis-results-heading">
+            <span>{filteredPlaces.length} luoghi</span>
+            {(selectedItinerary !== 'all' || selectedPeriodId !== 'all' || query) ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery('')
+                  setSelectedItinerary('all')
+                  setSelectedPeriodId('all')
+                }}
+              >
+                Azzera filtri
+              </button>
+            ) : null}
+          </div>
+
+          <div className="gis-results">
+            {loading ? <div className="gis-status">Caricamento dei luoghi…</div> : null}
+            {error ? (
+              <div className="gis-status is-error">
+                <span>{error}</span>
+                <button type="button" onClick={reload}>Riprova</button>
+              </div>
+            ) : null}
+            {!loading && !error && !filteredPlaces.length ? (
+              <div className="gis-status">
+                Nessun luogo corrisponde ai filtri. Gli itinerari possono essere assegnati dalla scheda di modifica.
+              </div>
+            ) : null}
+            {filteredPlaces.map(({ place, activeLayer }) => {
+              const cover = activeLayer.place_images?.find((image) => image.is_primary)
+                ?? activeLayer.place_images?.[0]
+              return (
+                <button
+                  key={place.id}
+                  className={`gis-result-card ${selectedPlace?.id === place.id ? 'is-active' : ''}`}
+                  type="button"
+                  onClick={() => selectPlace(place, activeLayer)}
+                >
+                  <ResultCover image={cover} />
+                  <span>
+                    <strong>{activeLayer.title || place.canonical_name}</strong>
+                    <small>{place.canonical_name}</small>
+                  </span>
+                  {place.visited ? <Check className="gis-result-visited" /> : null}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="gis-map-stage">
+        <Map
+          markers={markers}
+          activePlaceId={selectedPlace?.id}
+          onSelectPlace={selectPlace}
         />
-        <div
-          className={`absolute bottom-0 left-0 right-0 flex max-h-[82vh] flex-col rounded-t-3xl border-t border-slate-800 bg-slate-950/95 p-5 shadow-2xl transition-transform ${
-            selectedPlace ? 'translate-y-0' : 'translate-y-full'
-          }`}
-        >
-          <div
-            className="-mt-2 mb-2 flex items-center justify-center"
-            onPointerDown={handleMobileDrawerPointerDown}
-            onPointerMove={handleMobileDrawerPointerMove}
-            onPointerUp={handleMobileDrawerPointerUp}
-            onPointerCancel={handleMobileDrawerPointerUp}
-            role="presentation"
-          >
-            <span className="h-1.5 w-12 rounded-full bg-slate-700" />
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-6">
-            <PlaceDrawer
-              place={selectedPlace}
-              activeLayer={
-                filteredPlaces.find((entry) => entry.place.id === selectedPlace?.id)?.activeLayer
-              }
-              activeLayers={
-                filteredPlaces.find((entry) => entry.place.id === selectedPlace?.id)?.activeLayers ??
-                []
-              }
-              periods={periods}
-              onSelectLayer={(layer) => {
-                if (layer?.id && selectedPlace?.id) {
-                  setSelectedLayerByPlaceId((current) => ({
-                    ...current,
-                    [selectedPlace.id]: layer.id,
-                  }))
-                }
-              }}
-              onClose={() => setSelectedPlace(null)}
-              onToggleVisited={handleToggleVisited}
-              onPlaceUpdated={handlePlaceUpdated}
+
+        <div className="gis-map-badge">
+          <MapPin />
+          <span><strong>{filteredPlaces.length}</strong> luoghi sulla mappa</span>
+        </div>
+
+        <button className="gis-mobile-filter-button" type="button" onClick={() => setMobileFiltersOpen(true)}>
+          <Filter /> Filtri
+          {(selectedItinerary !== 'all' || selectedPeriodId !== 'all') ? <span /> : null}
+        </button>
+
+        {canEdit ? (
+          <Link className="gis-add-button" to="/add-location">
+            <Plus /> <span>Aggiungi luogo</span>
+          </Link>
+        ) : null}
+
+        {selectedPlace ? (
+          <>
+            <button
+              className="gis-panel-backdrop"
+              type="button"
+              aria-label="Chiudi scheda luogo"
+              onClick={() => setSelectedPlace(null)}
             />
+            <PlaceDrawer
+              key={selectedPlace.id}
+              place={selectedPlace}
+              activeLayer={activeEntry?.activeLayer}
+              periods={periods}
+              onSelectLayer={(layer) => selectPlace(selectedPlace, layer)}
+              onClose={() => setSelectedPlace(null)}
+              onToggleVisited={toggleVisited}
+              onPlaceUpdated={(updated) => {
+                setPlaces((current) => current.map((place) => place.id === updated.id ? updated : place))
+                setSelectedPlace(updated)
+              }}
+            />
+          </>
+        ) : null}
+      </section>
+
+      <div className={`gis-mobile-sheet ${mobileFiltersOpen ? 'is-open' : ''}`}>
+        <button className="gis-mobile-sheet-backdrop" type="button" onClick={() => setMobileFiltersOpen(false)} aria-label="Chiudi filtri" />
+        <div>
+          <header><h2>Filtra la mappa</h2><button type="button" onClick={() => setMobileFiltersOpen(false)}><X /></button></header>
+          <span className="gis-filter-label">Itinerari</span>
+          <div className="gis-itinerary-grid">
+            {itineraries.map(({ id, shortLabel, icon: Icon }) => (
+              <button
+                key={id}
+                className={selectedItinerary === id ? 'is-active' : ''}
+                type="button"
+                onClick={() => setSelectedItinerary((current) => current === id ? 'all' : id)}
+              >
+                <Icon /><span>{shortLabel}</span><strong>{itineraryCounts[id]}</strong>
+              </button>
+            ))}
           </div>
+          <TimelineSlider periods={periods} />
+          <label className="gis-period-select">
+            <span>Periodo storico</span>
+            <select value={selectedPeriodId} onChange={(event) => setSelectedPeriodId(event.target.value)}>
+              <option value="all">Tutti i periodi</option>
+              {periods.map((period) => <option key={period.id} value={period.id}>{period.name}</option>)}
+            </select>
+          </label>
+          <button className="gis-apply-button" type="button" onClick={() => setMobileFiltersOpen(false)}>
+            Mostra {filteredPlaces.length} luoghi
+          </button>
         </div>
       </div>
     </main>

@@ -57,6 +57,13 @@ export async function uploadPlaceImage(file, placeId) {
   return apiRequest('/uploads', { method: 'POST', body: form })
 }
 
+export async function uploadPlaceImages(files, placeId) {
+  const form = new FormData()
+  form.set('placeId', placeId)
+  files.forEach((file) => form.append('files', file))
+  return apiRequest('/uploads', { method: 'POST', body: form })
+}
+
 export async function fetchEditorTable(table) {
   return apiRequest(`/editor/tables/${encodeURIComponent(table)}`)
 }

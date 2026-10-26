@@ -1,6 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
-import Navbar from './components/Navbar'
-import MobileMenu from './components/MobileMenu'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import AddPlace from './pages/AddPlace'
 import HomeMap from './pages/HomeMap'
 import NotesPage from './pages/NotesPage'
@@ -12,17 +10,24 @@ import LoginPage from './pages/LoginPage'
 import UsersPage from './pages/UsersPage'
 import AccountPage from './pages/AccountPage'
 import ProtectedRoute from './components/ProtectedRoute'
+import FrontPage from './frontpage/FrontPage'
+import SiteHeader from './components/SiteHeader'
+import { frontpageThemeVariables } from './frontpage/theme'
 
 function App() {
+  const location = useLocation()
+  const isFrontPage = location.pathname === '/'
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      {/* {!isHome ? <Navbar variant="sticky" /> : null} */}
-      <Navbar variant="sticky" />
-      {/* mobile menu mounted globally so all pages share the same mobile menu component */}
-      <MobileMenu />
+    <div
+      className={isFrontPage ? 'min-h-screen' : 'app-shell min-h-screen'}
+      style={frontpageThemeVariables}
+    >
+      <SiteHeader />
 
       <Routes>
-        <Route path="/" element={<HomeMap />} />
+        <Route path="/" element={<FrontPage />} />
+        <Route path="/mappa" element={<HomeMap />} />
         <Route path="/timeline" element={<TimelinePage />} />
         <Route path="/podcasts" element={<PodcastsPage />} />
         <Route path="/notes" element={<NotesPage />} />

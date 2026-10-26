@@ -1,83 +1,97 @@
+import { CalendarDays, Clock3, ExternalLink, Headphones, Radio } from 'lucide-react'
 import usePodcastsData from '../hooks/usePodcastsData'
+import { siteContacts } from '../frontpage/siteConfig'
+
+function formatDate(value) {
+  if (!value) {
+    return ''
+  }
+
+  return new Intl.DateTimeFormat('it-IT', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(value))
+}
 
 function PodcastsPage() {
-  const { episodes, loading, error } = usePodcastsData()
+  const { podcast, episodes, loading, error } = usePodcastsData()
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-      <section className="panel">
-        <div className="panel-header">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-300/80">
-            Archivio podcast
+    <main className="podcast-page">
+      <section className="podcast-page-hero">
+        <div className="podcast-cover-wrap">
+          {podcast?.image ? <img src={podcast.image} alt={`Copertina di ${podcast.title}`} /> : null}
+          <span className="podcast-live-badge"><Radio aria-hidden="true" /> RSS live</span>
+        </div>
+        <div>
+          <p className="app-kicker">Il nostro podcast</p>
+          <h1>{podcast?.title || 'Lecco — La Città sul Lago'}</h1>
+          <p className="podcast-intro">
+            {podcast?.description || 'La storia di Lecco raccontata da chi la abita, episodio dopo episodio.'}
           </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">
-            Storie oltre la mappa
-          </h1>
-          <p className="mt-3 text-sm leading-6 text-slate-300">
-            Esplora narrazioni audio legate al paesaggio di Lecco. Integrazioni con Spotify e YouTube pronte per futuri sviluppi.
-          </p>
+          <a className="app-primary-button" href={siteContacts.spotify.href} target="_blank" rel="noreferrer">
+            Segui su Spotify <ExternalLink aria-hidden="true" />
+          </a>
+        </div>
+      </section>
+
+      <section className="podcast-archive" aria-labelledby="episodes-heading">
+        <div className="podcast-archive-heading">
+          <div>
+            <p className="app-kicker">Dal feed RSS</p>
+            <h2 id="episodes-heading">Tutti gli episodi</h2>
+          </div>
+          {!loading && !error ? <span>{episodes.length} episodi</span> : null}
         </div>
 
-        <div className="panel-body">
-          {error ? (
-            <div className="mb-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200">
-              {error}
-            </div>
-          ) : null}
-
-          {loading ? (
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-300">
-              Caricamento episodi podcast…
-            </div>
-          ) : null}
-
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {episodes.map((episode) => (
-              <article
-                key={episode.id}
-                className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 shadow-lg shadow-black/10"
-              >
-                {episode.cover_image ? (
-                  <img
-                    alt={episode.title}
-                    className="mb-4 h-40 w-full rounded-2xl object-cover"
-                    src={episode.cover_image}
-                  />
-                ) : null}
-                <p className="text-xs uppercase tracking-[0.18em] text-cyan-300/70">Episodio</p>
-                <h2 className="mt-2 text-lg font-semibold text-white">{episode.title}</h2>
-                <p className="mt-3 text-sm leading-6 text-slate-300">{episode.short_description}</p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {episode.spotify_url ? (
-                    <a
-                      className="rounded-full border border-emerald-400/40 px-3 py-1 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-400/10"
-                      href={episode.spotify_url}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      Spotify
-                    </a>
-                  ) : null}
-                  {episode.youtube_url ? (
-                    <a
-                      className="rounded-full border border-rose-400/40 px-3 py-1 text-xs font-semibold text-rose-200 transition hover:bg-rose-400/10"
-                      href={episode.youtube_url}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      YouTube
-                    </a>
-                  ) : null}
-                </div>
-              </article>
-            ))}
-
-            {!loading && episodes.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/60 p-5 text-sm text-slate-400 md:col-span-2 xl:col-span-3">
-                Nessun episodio podcast disponibile.
-              </div>
-            ) : null}
+        {error ? (
+          <div className="app-message app-message-error" role="alert">
+            <strong>Non siamo riusciti a caricare il feed.</strong>
+            <span>{error}</span>
           </div>
+        ) : null}
+
+        {loading ? (
+          <div className="podcast-loading" role="status">
+            <Headphones aria-hidden="true" />
+            <span>Stiamo sintonizzando gli episodi…</span>
+          </div>
+        ) : null}
+
+        <div className="episode-list">
+          {episodes.map((episode, index) => (
+            <article className="episode-card" key={episode.id}>
+              <div className="episode-number">
+                {episode.type === 'bonus' ? 'Extra' : episode.number ? `E${episode.number}` : String(index + 1).padStart(2, '0')}
+              </div>
+              <div className="episode-content">
+                <div className="episode-meta">
+                  <span><CalendarDays aria-hidden="true" /> {formatDate(episode.publishedAt)}</span>
+                  {episode.duration ? <span><Clock3 aria-hidden="true" /> {episode.duration}</span> : null}
+                </div>
+                <h3>{episode.title}</h3>
+                <p>{episode.shortDescription}</p>
+                {episode.audioUrl ? (
+                  <audio controls preload="none">
+                    <source src={episode.audioUrl} type={episode.audioType} />
+                    Il tuo browser non supporta la riproduzione audio.
+                  </audio>
+                ) : null}
+              </div>
+              {episode.link ? (
+                <a
+                  className="episode-external-link"
+                  href={episode.link}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`Apri ${episode.title} su Spotify`}
+                >
+                  <ExternalLink aria-hidden="true" />
+                </a>
+              ) : null}
+            </article>
+          ))}
         </div>
       </section>
     </main>

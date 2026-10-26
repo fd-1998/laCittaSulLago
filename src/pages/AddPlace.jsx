@@ -498,7 +498,7 @@ function AddPlace() {
     }
 
     setIsSubmitting(false)
-    navigate('/')
+    navigate('/mappa')
   }
 
   return (

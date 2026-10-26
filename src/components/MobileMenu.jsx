@@ -13,7 +13,7 @@ import {
 } from './UiIcons'
 
 const publicLinks = [
-  { to: '/', label: 'Mappa', icon: HomeIcon },
+  { to: '/mappa', label: 'Mappa', icon: HomeIcon },
   { to: '/timeline', label: 'Cronologia', icon: TimelineIcon },
   { to: '/podcasts', label: 'Podcast', icon: PodcastsIcon },
   { to: '/notes', label: 'Note', icon: NotesIcon },

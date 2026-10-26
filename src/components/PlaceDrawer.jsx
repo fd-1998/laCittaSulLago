@@ -1,666 +1,547 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { uploadPlaceImage } from '../lib/api'
+import {
+  BookOpen,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Expand,
+  Headphones,
+  Images,
+  MapPin,
+  Pencil,
+  Plus,
+  Upload,
+  X,
+} from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import CoordinatePicker from './CoordinatePicker'
-import ImageUploader from './ImageUploader'
-import { AddIcon, CloseIcon, TimelineIcon } from './UiIcons'
 import {
   createHistoricalLayer,
-  deleteLayerImages,
   fetchPlaceById,
+  fetchTags,
   insertLayerImage,
+  replaceLayerImages,
   updateHistoricalLayer,
   updatePlace,
+  updatePlaceTags,
 } from '../services/places'
+import {
+  buildImagePayloads,
+  cleanupDrafts,
+  createFileDraft,
+  createUrlDraft,
+  draftsFromImages,
+  validateImageFiles,
+} from '../lib/imageDrafts'
+import ImageUploader from './ImageUploader'
 
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024
-
-const initialNewLayerForm = {
+const emptyLayer = {
   title: '',
   short_description: '',
   long_description: '',
   start_year: '',
   end_year: '',
-  period_id: '',
-  marker_color: '#38bdf8',
+  historical_period_id: '',
+  marker_color: '#D27271',
   marker_icon: '',
 }
 
-const buildLayerForm = (layer) => ({
-  title: layer?.title ?? '',
-  short_description: layer?.short_description ?? '',
-  long_description: layer?.long_description ?? '',
-  start_year: layer?.start_year ?? '',
-  end_year: layer?.end_year ?? '',
-  period_id: layer?.historical_period_id ?? '',
-  marker_color: layer?.marker_color ?? '#38bdf8',
-  marker_icon: layer?.marker_icon ?? '',
-})
+function formatYear(year) {
+  const numeric = Number(year)
+  if (Number.isNaN(numeric)) return year
+  return numeric < 0 ? `${Math.abs(numeric).toLocaleString('it-IT')} a.C.` : `${numeric} d.C.`
+}
 
-function resolvePeriodId(value) {
-  if (value == null || value === '') {
-    return null
+function imageUrl(image) {
+  return image?.image_url || image?.thumbnail_url || ''
+}
+
+function SafeImage({ src, alt }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) {
+    return <span className="place-image-fallback"><Images aria-hidden="true" /> Immagine non disponibile</span>
   }
-
-  const numericValue = Number(value)
-  if (!Number.isNaN(numericValue)) {
-    return numericValue
-  }
-
-  return value
+  return <img src={src} alt={alt} onError={() => setFailed(true)} />
 }
 
-function createPreviewItem(file, isPrimary = false) {
-  return {
-    id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    file,
-    previewUrl: URL.createObjectURL(file),
-    imageUrl: null,
-    caption: file.name,
-    isPrimary,
-    source: 'file',
-    revokeUrl: true,
-  }
-}
-
-function createUrlPreviewItem(url, isPrimary = false) {
-  const trimmedUrl = url.trim()
-  const fileName = trimmedUrl.split('/').pop() || 'immagine-link'
-  return {
-    id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    file: {
-      name: fileName,
-      size: 0,
-    },
-    previewUrl: trimmedUrl,
-    imageUrl: trimmedUrl,
-    caption: fileName,
-    isPrimary,
-    source: 'url',
-    revokeUrl: false,
-  }
-}
-
-function mapExistingImages(layer) {
-  return (layer?.place_images ?? []).map((image) => {
-    const url = image.thumbnail_url || image.image_url
-    return {
-      id: image.id,
-      file: {
-        name: image.caption || url?.split('/').pop() || 'immagine',
-        size: 0,
-      },
-      previewUrl: url,
-      imageUrl: image.image_url || url,
-      caption: image.caption,
-      isPrimary: Boolean(image.is_primary),
-      source: 'existing',
-      revokeUrl: false,
-    }
-  })
-}
-
-function cleanupImages(items) {
-  items.forEach((image) => {
-    if (image.revokeUrl) {
-      URL.revokeObjectURL(image.previewUrl)
-    }
-  })
-}
-
-async function uploadImages({ images, layerId, placeId }) {
-  const urlImages = images.filter((image) => image.source === 'url' || image.source === 'existing')
-  const fileImages = images.filter((image) => image.source === 'file')
-
-  const payloads = []
-
-  urlImages.forEach((image) => {
-    const url = image.imageUrl || image.previewUrl
-    if (!url) {
-      return
-    }
-
-    payloads.push({
-      historical_layer_id: layerId,
-      image_url: url,
-      thumbnail_url: url,
-      caption: image.caption || image.file?.name,
-      is_primary: image.isPrimary,
-    })
-  })
-
-  if (fileImages.length) {
-    const uploadResults = await Promise.all(
-      fileImages.map(async (image) => {
-        try {
-          const uploaded = await uploadPlaceImage(image.file, placeId)
-          return {
-            status: 'fulfilled',
-            payload: {
-              historical_layer_id: layerId,
-              image_url: uploaded.publicUrl,
-              thumbnail_url: uploaded.publicUrl,
-              caption: image.caption || image.file.name,
-              is_primary: image.isPrimary,
-            },
-          }
-        } catch (uploadError) {
-          return { status: 'rejected', error: uploadError }
-        }
-      }),
+function Gallery({ images, placeName, onOpen }) {
+  if (!images.length) {
+    return (
+      <div className="place-panel-empty">
+        <Images aria-hidden="true" />
+        <span>Nessuna immagine disponibile.</span>
+      </div>
     )
-
-    const successful = uploadResults.filter((result) => result.status === 'fulfilled')
-    const failed = uploadResults.filter((result) => result.status === 'rejected')
-
-    successful.forEach((result) => payloads.push(result.payload))
-
-    if (failed.length) {
-      return { payloads, error: failed[0]?.error ?? new Error('Errore nel caricamento immagini') }
-    }
   }
 
-  return { payloads, error: null }
+  return (
+    <div className={`place-gallery-grid ${images.length === 1 ? 'is-single' : ''}`}>
+      {images.slice(0, 5).map((image, index) => (
+        <button key={image.id ?? imageUrl(image)} type="button" onClick={() => onOpen(index)}>
+          <SafeImage src={image.thumbnail_url || image.image_url} alt={image.caption || placeName} />
+          {index === 4 && images.length > 5 ? (
+            <span className="place-gallery-more">+{images.length - 5}</span>
+          ) : null}
+          <Expand aria-hidden="true" />
+        </button>
+      ))}
+    </div>
+  )
 }
 
-function LayerSection({
-  place,
-  layer,
-  periods,
-  isActive,
-  onSelectLayer,
-  onPlaceUpdated,
-  canEdit,
-}) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [form, setForm] = useState(() => buildLayerForm(layer))
-  const [editImages, setEditImages] = useState(() => mapExistingImages(layer))
-  const [imageUrlInput, setImageUrlInput] = useState('')
-  const [imageUrlError, setImageUrlError] = useState('')
+function Lightbox({ images, index, placeName, onClose, onChange }) {
+  const image = images[index]
+  if (!image) return null
+
+  return (
+    <div className="place-lightbox" role="dialog" aria-modal="true" aria-label="Galleria immagini">
+      <button className="place-lightbox-close" type="button" onClick={onClose} aria-label="Chiudi galleria">
+        <X />
+      </button>
+      {images.length > 1 ? (
+        <>
+          <button
+            className="place-lightbox-arrow is-left"
+            type="button"
+            onClick={() => onChange((index - 1 + images.length) % images.length)}
+            aria-label="Immagine precedente"
+          >
+            <ChevronLeft />
+          </button>
+          <button
+            className="place-lightbox-arrow is-right"
+            type="button"
+            onClick={() => onChange((index + 1) % images.length)}
+            aria-label="Immagine successiva"
+          >
+            <ChevronRight />
+          </button>
+        </>
+      ) : null}
+      <figure>
+        <SafeImage src={imageUrl(image)} alt={image.caption || placeName} />
+        <figcaption>
+          <span>{image.caption || placeName}</span>
+          <span>{index + 1} / {images.length}</span>
+        </figcaption>
+      </figure>
+    </div>
+  )
+}
+
+function PlaceEditor({ place, layer, periods, onSaved, onCancel }) {
+  const [placeForm, setPlaceForm] = useState({
+    canonical_name: place.canonical_name ?? '',
+    latitude: place.latitude ?? '',
+    longitude: place.longitude ?? '',
+  })
+  const [layerForm, setLayerForm] = useState({
+    ...emptyLayer,
+    ...layer,
+    historical_period_id: layer?.historical_period_id ?? '',
+  })
+  const [tags, setTags] = useState([])
+  const [selectedTagIds, setSelectedTagIds] = useState(
+    () => new Set(place.place_tags?.map((entry) => entry.tags?.id).filter(Boolean) ?? []),
+  )
+  const [images, setImages] = useState(() => draftsFromImages(layer?.place_images))
+  const [imageUrl, setImageUrl] = useState('')
   const [error, setError] = useState('')
-  const [isSaving, setIsSaving] = useState(false)
-  const imagesRef = useRef([])
-
-  const tags = place.place_tags?.map((tag) => tag.tags?.name).filter(Boolean) ?? []
-  const podcasts =
-    layer.place_podcast_episodes?.map((entry) => entry.podcast_episodes).filter(Boolean) ?? []
-  const notes = layer.notes ?? []
-  const period = layer.historical_periods
+  const [saving, setSaving] = useState(false)
+  const imagesRef = useRef(images)
 
   useEffect(() => {
-    imagesRef.current = editImages
-  }, [editImages])
-
-  useEffect(() => {
-    return () => {
-      cleanupImages(imagesRef.current)
-    }
+    fetchTags().then(({ data, error: tagsError }) => {
+      if (tagsError) setError(tagsError.message)
+      else setTags(data ?? [])
+    })
   }, [])
 
   useEffect(() => {
-    if (!isEditing) {
-      // Reset the draft when the selected layer changes.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setForm(buildLayerForm(layer))
-      setEditImages(mapExistingImages(layer))
-    }
-  }, [layer, isEditing])
+    imagesRef.current = images
+  }, [images])
 
-  function updateField(event) {
-    const { name, value } = event.target
-    setForm((current) => ({ ...current, [name]: value }))
+  useEffect(() => () => cleanupDrafts(imagesRef.current), [])
+
+  function addFiles(fileList) {
+    const { accepted, rejected } = validateImageFiles(fileList)
+    if (rejected.length) setError(rejected.join(' · '))
+    if (!accepted.length) return
+    setImages((current) => [
+      ...current,
+      ...accepted.map((file, index) => createFileDraft(
+        file,
+        !current.some((item) => item.isPrimary) && index === 0,
+      )),
+    ])
   }
 
-  function validateAndAddFiles(fileList) {
-    const incoming = Array.from(fileList ?? [])
-    if (!incoming.length) {
-      return
-    }
-
-    const accepted = []
-    const rejected = []
-
-    for (const file of incoming) {
-      if (!file.type.startsWith('image/')) {
-        rejected.push(`${file.name} non è un'immagine`)
-        continue
-      }
-
-      if (file.size > MAX_IMAGE_SIZE) {
-        rejected.push(`${file.name} è più grande di 10 MB`)
-        continue
-      }
-
-      accepted.push(file)
-    }
-
-    if (rejected.length) {
-      setError(rejected.join(' · '))
-    } else {
-      setError('')
-    }
-
-    if (!accepted.length) {
-      return
-    }
-
-    setEditImages((current) => {
-      const nextItems = accepted.map((file, index) => createPreviewItem(file, current.length === 0 && index === 0))
-
-      if (!current.some((image) => image.isPrimary) && nextItems.length) {
-        nextItems[0] = { ...nextItems[0], isPrimary: true }
-      }
-
-      return [...current, ...nextItems]
-    })
-  }
-
-  function removeImage(imageId) {
-    setEditImages((current) => {
-      const removed = current.find((image) => image.id === imageId)
-      if (removed?.revokeUrl) {
-        URL.revokeObjectURL(removed.previewUrl)
-      }
-
-      const next = current.filter((image) => image.id !== imageId)
-      if (!next.length) {
-        return []
-      }
-
-      if (!next.some((image) => image.isPrimary)) {
+  function removeImage(id) {
+    setImages((current) => {
+      const removed = current.find((item) => item.id === id)
+      if (removed?.revokeUrl) URL.revokeObjectURL(removed.previewUrl)
+      const next = current.filter((item) => item.id !== id)
+      if (next.length && !next.some((item) => item.isPrimary)) {
         next[0] = { ...next[0], isPrimary: true }
       }
-
       return next
     })
   }
 
-  function markPrimaryImage(imageId) {
-    setEditImages((current) => current.map((image) => ({ ...image, isPrimary: image.id === imageId })))
-  }
-
-  function handleAddImageUrl() {
-    const trimmed = imageUrlInput.trim()
-    if (!trimmed) {
-      setImageUrlError('Inserisci un link valido.')
-      return
-    }
-
-    let parsedUrl
-    try {
-      parsedUrl = new URL(trimmed)
-    } catch {
-      setImageUrlError('Il link non è valido.')
-      return
-    }
-
-    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-      setImageUrlError('Il link deve iniziare con http o https.')
-      return
-    }
-
-    setImageUrlError('')
-    setEditImages((current) => {
-      const isPrimary = !current.some((image) => image.isPrimary)
-      return [...current, createUrlPreviewItem(trimmed, isPrimary)]
-    })
-    setImageUrlInput('')
-  }
-
-  function cancelEdit() {
-    setIsEditing(false)
+  async function save() {
     setError('')
-    setImageUrlError('')
-    setImageUrlInput('')
-    cleanupImages(editImages)
-    setEditImages(mapExistingImages(layer))
-    setForm(buildLayerForm(layer))
-  }
-
-  async function handleSave() {
-    setError('')
-
-    const startYear = Number(form.start_year)
-    const endYear = Number(form.end_year)
-    const resolvedPeriodId = resolvePeriodId(form.period_id)
-
-    if (!form.title.trim() || !form.short_description.trim() || !form.long_description.trim()) {
-      setError('Compila il titolo del livello, la descrizione breve e la descrizione estesa.')
+    const latitude = Number(placeForm.latitude)
+    const longitude = Number(placeForm.longitude)
+    const startYear = Number(layerForm.start_year)
+    const endYear = Number(layerForm.end_year)
+    if (!placeForm.canonical_name.trim() || !layerForm.title.trim()) {
+      setError('Nome del luogo e titolo del livello sono obbligatori.')
       return
     }
-
-    if (!form.period_id || resolvedPeriodId == null) {
-      setError('Seleziona un periodo storico valido.')
+    if ([latitude, longitude, startYear, endYear].some(Number.isNaN)) {
+      setError('Coordinate e anni devono essere numeri validi.')
       return
     }
-
-    if (Number.isNaN(startYear) || Number.isNaN(endYear)) {
-      setError('Anno inizio e anno fine devono essere numeri validi.')
-      return
-    }
-
     if (startYear > endYear) {
-      setError("L'anno di inizio deve essere minore o uguale all'anno di fine.")
+      setError("L'anno iniziale non può essere successivo a quello finale.")
       return
     }
 
-    if (editImages.some((image) => image.file.size > MAX_IMAGE_SIZE)) {
-      setError('Una o più immagini sono troppo grandi. Ogni file deve essere massimo 10 MB.')
-      return
-    }
-
-    setIsSaving(true)
-
-    const { error: layerError } = await updateHistoricalLayer(layer.id, {
-      title: form.title.trim(),
-      short_description: form.short_description.trim(),
-      long_description: form.long_description.trim(),
-      start_year: startYear,
-      end_year: endYear,
-      historical_period_id: resolvedPeriodId,
-      marker_color: form.marker_color || '#38bdf8',
-      marker_icon: form.marker_icon?.trim() || null,
-    })
-
-    if (layerError) {
-      setIsSaving(false)
-      setError(layerError.message || 'Errore durante il salvataggio del livello storico.')
-      return
-    }
-
-    const { error: deleteError } = await deleteLayerImages(layer.id)
-    if (deleteError) {
-      setIsSaving(false)
-      setError(deleteError.message || 'Errore durante la sostituzione delle immagini.')
-      return
-    }
-
-    if (editImages.length) {
-      const { payloads, error: uploadError } = await uploadImages({
-        images: editImages,
-        layerId: layer.id,
-        placeId: place.id,
+    setSaving(true)
+    try {
+      const { error: placeError } = await updatePlace(place.id, {
+        canonical_name: placeForm.canonical_name.trim(),
+        latitude,
+        longitude,
       })
+      if (placeError) throw placeError
 
-      if (uploadError) {
-        setIsSaving(false)
-        setError(uploadError.message || 'Errore durante il caricamento delle immagini.')
-        return
-      }
+      const { error: tagsError } = await updatePlaceTags(place.id, [...selectedTagIds])
+      if (tagsError) throw tagsError
 
-      if (payloads.length) {
-        const { error: insertError } = await insertLayerImage(payloads)
-        if (insertError) {
-          setIsSaving(false)
-          setError('Le modifiche sono state salvate, ma non è stato possibile collegare le immagini.')
-          return
-        }
-      }
+      const { error: layerError } = await updateHistoricalLayer(layer.id, {
+        historical_period_id: layerForm.historical_period_id || null,
+        title: layerForm.title.trim(),
+        short_description: layerForm.short_description?.trim() || null,
+        long_description: layerForm.long_description?.trim() || null,
+        start_year: startYear,
+        end_year: endYear,
+        marker_color: layerForm.marker_color || null,
+        marker_icon: layerForm.marker_icon?.trim() || null,
+      })
+      if (layerError) throw layerError
+
+      const payloads = await buildImagePayloads(images, layer.id, place.id)
+      const { error: imagesError } = await replaceLayerImages(layer.id, payloads)
+      if (imagesError) throw imagesError
+
+      const { data: refreshed, error: refreshError } = await fetchPlaceById(place.id)
+      if (refreshError) throw refreshError
+      onSaved(refreshed)
+    } catch (saveError) {
+      setError(saveError.message || 'Non è stato possibile salvare le modifiche.')
+    } finally {
+      setSaving(false)
     }
-
-    const { data: updatedPlace, error: reloadError } = await fetchPlaceById(place.id)
-    if (reloadError) {
-      setIsSaving(false)
-      setError('Modifiche salvate, ma non è stato possibile ricaricare il luogo.')
-      return
-    }
-
-    onPlaceUpdated?.(updatedPlace)
-    setIsSaving(false)
-    setIsEditing(false)
   }
 
   return (
-    <article className="rounded-3xl border border-slate-800/80 bg-slate-950/80 p-5 shadow-lg">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="place-editor">
+      <div className="place-editor-heading">
         <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/70">
-              {period?.name ?? 'Periodo storico'}
-            </p>
-            {isActive ? (
-              <span className="rounded-full border border-cyan-400/50 bg-cyan-400/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-200">
-                Attivo
-              </span>
-            ) : null}
-          </div>
-          <h3 className="mt-2 text-xl font-semibold text-white">
-            {layer.title ?? place.canonical_name ?? 'Luogo storico'}
-          </h3>
-          <p className="mt-1 text-xs text-slate-400">
-            {layer.start_year} → {layer.end_year}
-          </p>
+          <span className="place-panel-kicker">Modalità modifica</span>
+          <h3>Aggiorna luogo e racconto</h3>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onSelectLayer?.(layer)}
-            className="inline-flex items-center gap-2 rounded-full border border-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-cyan-400/40 hover:text-white"
+        <button type="button" onClick={onCancel}>Annulla</button>
+      </div>
+
+      {error ? <div className="place-panel-error" role="alert">{error}</div> : null}
+
+      <div className="place-editor-grid">
+        <label>
+          <span>Nome del luogo</span>
+          <input
+            value={placeForm.canonical_name}
+            onChange={(event) => setPlaceForm((current) => ({ ...current, canonical_name: event.target.value }))}
+          />
+        </label>
+        <label>
+          <span>Titolo del racconto</span>
+          <input
+            value={layerForm.title}
+            onChange={(event) => setLayerForm((current) => ({ ...current, title: event.target.value }))}
+          />
+        </label>
+        <label>
+          <span>Latitudine</span>
+          <input
+            type="number"
+            value={placeForm.latitude}
+            onChange={(event) => setPlaceForm((current) => ({ ...current, latitude: event.target.value }))}
+          />
+        </label>
+        <label>
+          <span>Longitudine</span>
+          <input
+            type="number"
+            value={placeForm.longitude}
+            onChange={(event) => setPlaceForm((current) => ({ ...current, longitude: event.target.value }))}
+          />
+        </label>
+        <label>
+          <span>Anno iniziale</span>
+          <input
+            type="number"
+            value={layerForm.start_year}
+            onChange={(event) => setLayerForm((current) => ({ ...current, start_year: event.target.value }))}
+          />
+        </label>
+        <label>
+          <span>Anno finale</span>
+          <input
+            type="number"
+            value={layerForm.end_year}
+            onChange={(event) => setLayerForm((current) => ({ ...current, end_year: event.target.value }))}
+          />
+        </label>
+        <label>
+          <span>Colore marker</span>
+          <input
+            type="color"
+            value={layerForm.marker_color || '#D27271'}
+            onChange={(event) => setLayerForm((current) => ({ ...current, marker_color: event.target.value }))}
+          />
+        </label>
+        <label>
+          <span>Icona marker</span>
+          <input
+            value={layerForm.marker_icon ?? ''}
+            placeholder="Opzionale"
+            onChange={(event) => setLayerForm((current) => ({ ...current, marker_icon: event.target.value }))}
+          />
+        </label>
+        <label className="is-wide">
+          <span>Periodo storico</span>
+          <select
+            value={layerForm.historical_period_id}
+            onChange={(event) => setLayerForm((current) => ({
+              ...current,
+              historical_period_id: event.target.value,
+            }))}
           >
-            Mostra sulla mappa
-          </button>
-          {canEdit ? (
-            <button
-              type="button"
-              onClick={isEditing ? cancelEdit : () => setIsEditing(true)}
-              className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 px-3 py-2 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-400/10"
-            >
-              {isEditing ? 'Annulla' : 'Modifica'}
-            </button>
-          ) : null}
-        </div>
+            <option value="">Nessun periodo</option>
+            {periods.map((period) => <option key={period.id} value={period.id}>{period.name}</option>)}
+          </select>
+        </label>
+        <label className="is-wide">
+          <span>Descrizione breve</span>
+          <textarea
+            rows="3"
+            value={layerForm.short_description ?? ''}
+            onChange={(event) => setLayerForm((current) => ({ ...current, short_description: event.target.value }))}
+          />
+        </label>
+        <label className="is-wide">
+          <span>Racconto esteso</span>
+          <textarea
+            rows="7"
+            value={layerForm.long_description ?? ''}
+            onChange={(event) => setLayerForm((current) => ({ ...current, long_description: event.target.value }))}
+          />
+        </label>
       </div>
 
-      <div className="mt-4 space-y-4">
-        {error ? (
-          <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200" role="alert">
-            {error}
-          </div>
-        ) : null}
-
-        {isEditing ? (
-          <div className="space-y-4">
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-200">Titolo livello storico</span>
+      <fieldset className="place-tag-editor">
+        <legend>Itinerari e tag</legend>
+        <div>
+          {tags.map((tag) => (
+            <label key={tag.id}>
               <input
-                className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                name="title"
-                value={form.title}
-                onChange={updateField}
+                type="checkbox"
+                checked={selectedTagIds.has(tag.id)}
+                onChange={() => setSelectedTagIds((current) => {
+                  const next = new Set(current)
+                  if (next.has(tag.id)) next.delete(tag.id)
+                  else next.add(tag.id)
+                  return next
+                })}
               />
+              <span>{tag.name}</span>
             </label>
+          ))}
+        </div>
+      </fieldset>
 
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-200">Descrizione breve</span>
-              <textarea
-                className="min-h-24 w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                name="short_description"
-                value={form.short_description}
-                onChange={updateField}
-              />
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-200">Descrizione estesa</span>
-              <textarea
-                className="min-h-28 w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                name="long_description"
-                value={form.long_description}
-                onChange={updateField}
-              />
-            </label>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-200">Anno inizio</span>
-                <input
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                  name="start_year"
-                  type="number"
-                  value={form.start_year}
-                  onChange={updateField}
-                />
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-200">Anno fine</span>
-                <input
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                  name="end_year"
-                  type="number"
-                  value={form.end_year}
-                  onChange={updateField}
-                />
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-200">Colore marker</span>
-                <input
-                  className="h-12 w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-2 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                  name="marker_color"
-                  type="color"
-                  value={form.marker_color}
-                  onChange={updateField}
-                />
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-200">Icona marker (opzionale)</span>
-                <input
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                  name="marker_icon"
-                  value={form.marker_icon}
-                  onChange={updateField}
-                />
-              </label>
-            </div>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-200">Periodo storico</span>
-              <select
-                className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                name="period_id"
-                value={form.period_id}
-                onChange={updateField}
-              >
-                <option value="">Seleziona un periodo</option>
-                {periods.map((periodItem) => (
-                  <option key={periodItem.id} value={periodItem.id}>
-                    {periodItem.name} ({periodItem.start_year} → {periodItem.end_year})
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <div className="space-y-4">
-              <div className="rounded-3xl border border-slate-800 bg-slate-950/60 p-4">
-                <p className="text-sm font-medium text-slate-200">Aggiungi immagine da link</p>
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <input
-                    className="flex-1 rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-2.5 text-sm text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                    placeholder="https://..."
-                    value={imageUrlInput}
-                    onChange={(event) => setImageUrlInput(event.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddImageUrl}
-                    className="rounded-full bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
-                  >
-                    Aggiungi link
-                  </button>
-                </div>
-                {imageUrlError ? (
-                  <p className="mt-2 text-xs text-rose-300">{imageUrlError}</p>
-                ) : null}
-              </div>
-
-              <ImageUploader
-                disabled={isSaving}
-                images={editImages}
-                onAddFiles={validateAndAddFiles}
-                onMarkPrimary={markPrimaryImage}
-                onRemoveImage={removeImage}
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                className="inline-flex items-center justify-center rounded-full bg-cyan-400 px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={isSaving}
-                type="button"
-                onClick={handleSave}
-              >
-                {isSaving ? 'Salvataggio…' : 'Salva modifiche'}
-              </button>
-              <button
-                className="inline-flex items-center justify-center rounded-full border border-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/40 hover:text-white"
-                type="button"
-                onClick={cancelEdit}
-              >
-                Annulla modifiche
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <p className="text-sm leading-6 text-slate-300">{layer.long_description}</p>
-
-            <div className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-sm">
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Cronologia</p>
-                <p className="mt-1 text-slate-200">
-                  {layer.start_year} → {layer.end_year}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Periodo</p>
-                <p className="mt-1 text-slate-200">{period?.name ?? '—'}</p>
-              </div>
-              {tags.length ? (
-                <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Tag</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs text-cyan-200"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-              {podcasts.length ? (
-                <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Podcast</p>
-                  <ul className="mt-2 space-y-2 text-xs text-slate-300">
-                    {podcasts.map((episode) => (
-                      <li key={episode.id} className="rounded-2xl border border-slate-800 bg-slate-950/60 p-3">
-                        <p className="text-sm font-semibold text-white">{episode.title}</p>
-                        <p className="mt-1 text-slate-400">{episode.short_description}</p>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {notes.length ? (
-                <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Note</p>
-                  <ul className="mt-2 space-y-2 text-xs text-slate-300">
-                    {notes.map((note) => (
-                      <li key={note.id} className="rounded-2xl border border-slate-800 bg-slate-950/60 p-3">
-                        <p className="text-sm font-semibold text-white">{note.title}</p>
-                        {note.subtitle ? <p className="mt-1 text-slate-400">{note.subtitle}</p> : null}
-                        {note.content ? <p className="mt-2 text-slate-400">{note.content}</p> : null}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
-          </>
-        )}
+      <ImageUploader
+        images={images}
+        onAddFiles={addFiles}
+        onMarkPrimary={(id) => setImages((current) => current.map((item) => ({ ...item, isPrimary: item.id === id })))}
+        onRemoveImage={removeImage}
+        disabled={saving}
+      />
+      <div className="place-image-url">
+        <label>
+          <span>Oppure aggiungi un’immagine da URL</span>
+          <input
+            type="url"
+            value={imageUrl}
+            placeholder="https://…"
+            onChange={(event) => setImageUrl(event.target.value)}
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => {
+            try {
+              const parsed = new URL(imageUrl)
+              if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error()
+              setImages((current) => [
+                ...current,
+                createUrlDraft(imageUrl, !current.some((item) => item.isPrimary)),
+              ])
+              setImageUrl('')
+              setError('')
+            } catch {
+              setError('Inserisci un URL immagine valido.')
+            }
+          }}
+        >
+          Aggiungi URL
+        </button>
       </div>
-    </article>
+
+      <button className="place-save-button" type="button" onClick={save} disabled={saving}>
+        <Check aria-hidden="true" />
+        {saving ? 'Salvataggio in corso…' : 'Salva tutte le modifiche'}
+      </button>
+    </div>
+  )
+}
+
+function NewLayerForm({ place, periods, onCreated, onCancel }) {
+  const [form, setForm] = useState(emptyLayer)
+  const [images, setImages] = useState([])
+  const [imageUrl, setImageUrl] = useState('')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function create() {
+    const startYear = Number(form.start_year)
+    const endYear = Number(form.end_year)
+    if (!form.title.trim() || Number.isNaN(startYear) || Number.isNaN(endYear)) {
+      setError('Inserisci almeno titolo, anno iniziale e anno finale.')
+      return
+    }
+    setSaving(true)
+    try {
+      const { data: layer, error: layerError } = await createHistoricalLayer({
+        place_id: place.id,
+        historical_period_id: form.historical_period_id || null,
+        title: form.title.trim(),
+        short_description: form.short_description?.trim() || null,
+        long_description: form.long_description?.trim() || null,
+        start_year: startYear,
+        end_year: endYear,
+        marker_color: form.marker_color,
+        marker_icon: form.marker_icon?.trim() || null,
+      })
+      if (layerError) throw layerError
+      if (images.length) {
+        const payloads = await buildImagePayloads(images, layer.id, place.id)
+        const { error: imageError } = await insertLayerImage(payloads)
+        if (imageError) throw imageError
+      }
+      const { data: refreshed, error: refreshError } = await fetchPlaceById(place.id)
+      if (refreshError) throw refreshError
+      onCreated(refreshed, layer)
+    } catch (createError) {
+      setError(createError.message || 'Non è stato possibile creare il livello.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="place-editor">
+      <div className="place-editor-heading">
+        <div><span className="place-panel-kicker">Nuovo livello</span><h3>Aggiungi un’epoca</h3></div>
+        <button type="button" onClick={onCancel}>Annulla</button>
+      </div>
+      {error ? <div className="place-panel-error">{error}</div> : null}
+      <div className="place-editor-grid">
+        <label className="is-wide">
+          <span>Titolo</span>
+          <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} />
+        </label>
+        <label>
+          <span>Anno iniziale</span>
+          <input type="number" value={form.start_year} onChange={(event) => setForm((current) => ({ ...current, start_year: event.target.value }))} />
+        </label>
+        <label>
+          <span>Anno finale</span>
+          <input type="number" value={form.end_year} onChange={(event) => setForm((current) => ({ ...current, end_year: event.target.value }))} />
+        </label>
+        <label className="is-wide">
+          <span>Periodo</span>
+          <select value={form.historical_period_id} onChange={(event) => setForm((current) => ({ ...current, historical_period_id: event.target.value }))}>
+            <option value="">Nessun periodo</option>
+            {periods.map((period) => <option key={period.id} value={period.id}>{period.name}</option>)}
+          </select>
+        </label>
+        <label>
+          <span>Colore marker</span>
+          <input type="color" value={form.marker_color} onChange={(event) => setForm((current) => ({ ...current, marker_color: event.target.value }))} />
+        </label>
+        <label>
+          <span>Icona marker</span>
+          <input value={form.marker_icon} placeholder="Opzionale" onChange={(event) => setForm((current) => ({ ...current, marker_icon: event.target.value }))} />
+        </label>
+        <label className="is-wide">
+          <span>Descrizione breve</span>
+          <textarea rows="3" value={form.short_description} onChange={(event) => setForm((current) => ({ ...current, short_description: event.target.value }))} />
+        </label>
+        <label className="is-wide">
+          <span>Racconto esteso</span>
+          <textarea rows="6" value={form.long_description} onChange={(event) => setForm((current) => ({ ...current, long_description: event.target.value }))} />
+        </label>
+      </div>
+      <ImageUploader
+        images={images}
+        onAddFiles={(files) => {
+          const { accepted, rejected } = validateImageFiles(files)
+          if (rejected.length) setError(rejected.join(' · '))
+          setImages((current) => [...current, ...accepted.map((file, index) => createFileDraft(file, !current.length && index === 0))])
+        }}
+        onMarkPrimary={(id) => setImages((current) => current.map((item) => ({ ...item, isPrimary: item.id === id })))}
+        onRemoveImage={(id) => setImages((current) => current.filter((item) => item.id !== id))}
+        disabled={saving}
+      />
+      <div className="place-image-url">
+        <label>
+          <span>Oppure aggiungi un’immagine da URL</span>
+          <input type="url" value={imageUrl} placeholder="https://…" onChange={(event) => setImageUrl(event.target.value)} />
+        </label>
+        <button
+          type="button"
+          onClick={() => {
+            try {
+              const parsed = new URL(imageUrl)
+              if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error()
+              setImages((current) => [...current, createUrlDraft(imageUrl, !current.some((item) => item.isPrimary))])
+              setImageUrl('')
+              setError('')
+            } catch {
+              setError('Inserisci un URL immagine valido.')
+            }
+          }}
+        >
+          Aggiungi URL
+        </button>
+      </div>
+      <button className="place-save-button" type="button" onClick={create} disabled={saving}>
+        <Plus /> {saving ? 'Creazione…' : 'Crea livello storico'}
+      </button>
+    </div>
   )
 }
 
@@ -674,639 +555,174 @@ function PlaceDrawer({
   onPlaceUpdated,
 }) {
   const { canEdit } = useAuth()
-  const [isEditingPlace, setIsEditingPlace] = useState(false)
-  const [placeForm, setPlaceForm] = useState({
-    canonical_name: place?.canonical_name ?? '',
-    latitude: place?.latitude ?? '',
-    longitude: place?.longitude ?? '',
-  })
-  const [placeError, setPlaceError] = useState('')
-  const [isSavingPlace, setIsSavingPlace] = useState(false)
-  const [isAddingLayer, setIsAddingLayer] = useState(false)
-  const [newLayerForm, setNewLayerForm] = useState(initialNewLayerForm)
-  const [newLayerImages, setNewLayerImages] = useState([])
-  const [newLayerUrlInput, setNewLayerUrlInput] = useState('')
-  const [newLayerUrlError, setNewLayerUrlError] = useState('')
-  const [isCreatingLayer, setIsCreatingLayer] = useState(false)
-  const newLayerImagesRef = useRef([])
-
-  const layers = useMemo(() => {
-    const list = place?.place_historical_layers ?? []
-    return [...list].sort((a, b) => (a?.start_year ?? 0) - (b?.start_year ?? 0))
-  }, [place])
-
-  const placeGallery = useMemo(() => {
-    const allImages = place?.place_historical_layers
-      ?.flatMap((entry) => entry?.place_images ?? [])
-      .filter(Boolean) ?? []
-
-    const sorted = [...allImages].sort((a, b) => {
-      if (a?.is_primary && !b?.is_primary) return -1
-      if (!a?.is_primary && b?.is_primary) return 1
-      return 0
-    })
-
+  const [mode, setMode] = useState('view')
+  const [lightboxIndex, setLightboxIndex] = useState(null)
+  const layers = useMemo(
+    () => [...(place?.place_historical_layers ?? [])].sort((a, b) => Number(a.start_year) - Number(b.start_year)),
+    [place],
+  )
+  const gallery = useMemo(() => {
     const seen = new Set()
-    return sorted.filter((image) => {
-      const key = image.thumbnail_url || image.image_url || image.id
-      if (!key || seen.has(key)) {
-        return false
-      }
-      seen.add(key)
-      return true
-    })
-  }, [place])
-
-  useEffect(() => {
-    // Reset the place draft when the drawer receives another place.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPlaceForm({
-      canonical_name: place?.canonical_name ?? '',
-      latitude: place?.latitude ?? '',
-      longitude: place?.longitude ?? '',
-    })
-  }, [place])
-
-  useEffect(() => {
-    newLayerImagesRef.current = newLayerImages
-  }, [newLayerImages])
-
-  useEffect(() => {
-    return () => {
-      cleanupImages(newLayerImagesRef.current)
-    }
-  }, [])
-
-  if (!place) {
-    return null
-  }
-
-  function updatePlaceField(event) {
-    const { name, value } = event.target
-    setPlaceForm((current) => ({ ...current, [name]: value }))
-  }
-
-  function updateNewLayerField(event) {
-    const { name, value } = event.target
-    setNewLayerForm((current) => ({ ...current, [name]: value }))
-  }
-
-  function updateCoordinates({ latitude, longitude }) {
-    setPlaceForm((current) => ({
-      ...current,
-      latitude: latitude.toFixed(6),
-      longitude: longitude.toFixed(6),
-    }))
-  }
-
-  function validateAndAddNewLayerFiles(fileList) {
-    const incoming = Array.from(fileList ?? [])
-    if (!incoming.length) {
-      return
-    }
-
-    const accepted = []
-    const rejected = []
-
-    for (const file of incoming) {
-      if (!file.type.startsWith('image/')) {
-        rejected.push(`${file.name} non è un'immagine`)
-        continue
-      }
-
-      if (file.size > MAX_IMAGE_SIZE) {
-        rejected.push(`${file.name} è più grande di 10 MB`)
-        continue
-      }
-
-      accepted.push(file)
-    }
-
-    if (rejected.length) {
-      setPlaceError(rejected.join(' · '))
-    } else {
-      setPlaceError('')
-    }
-
-    if (!accepted.length) {
-      return
-    }
-
-    setNewLayerImages((current) => {
-      const nextItems = accepted.map((file, index) => createPreviewItem(file, current.length === 0 && index === 0))
-
-      if (!current.some((image) => image.isPrimary) && nextItems.length) {
-        nextItems[0] = { ...nextItems[0], isPrimary: true }
-      }
-
-      return [...current, ...nextItems]
-    })
-  }
-
-  function removeNewLayerImage(imageId) {
-    setNewLayerImages((current) => {
-      const removed = current.find((image) => image.id === imageId)
-      if (removed?.revokeUrl) {
-        URL.revokeObjectURL(removed.previewUrl)
-      }
-
-      const next = current.filter((image) => image.id !== imageId)
-      if (!next.length) {
-        return []
-      }
-
-      if (!next.some((image) => image.isPrimary)) {
-        next[0] = { ...next[0], isPrimary: true }
-      }
-
-      return next
-    })
-  }
-
-  function markPrimaryNewLayerImage(imageId) {
-    setNewLayerImages((current) => current.map((image) => ({ ...image, isPrimary: image.id === imageId })))
-  }
-
-  function handleAddNewLayerImageUrl() {
-    const trimmed = newLayerUrlInput.trim()
-    if (!trimmed) {
-      setNewLayerUrlError('Inserisci un link valido.')
-      return
-    }
-
-    let parsedUrl
-    try {
-      parsedUrl = new URL(trimmed)
-    } catch {
-      setNewLayerUrlError('Il link non è valido.')
-      return
-    }
-
-    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-      setNewLayerUrlError('Il link deve iniziare con http o https.')
-      return
-    }
-
-    setNewLayerUrlError('')
-    setNewLayerImages((current) => {
-      const isPrimary = !current.some((image) => image.isPrimary)
-      return [...current, createUrlPreviewItem(trimmed, isPrimary)]
-    })
-    setNewLayerUrlInput('')
-  }
-
-  async function handleSavePlace() {
-    setPlaceError('')
-
-    const latitude = Number(placeForm.latitude)
-    const longitude = Number(placeForm.longitude)
-
-    if (!placeForm.canonical_name.trim()) {
-      setPlaceError('Compila il nome canonico del luogo.')
-      return
-    }
-
-    if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
-      setPlaceError('Latitudine e longitudine devono essere numeri validi.')
-      return
-    }
-
-    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-      setPlaceError('La latitudine deve essere tra -90 e 90 e la longitudine tra -180 e 180.')
-      return
-    }
-
-    setIsSavingPlace(true)
-
-    const { error: placeError } = await updatePlace(place.id, {
-      canonical_name: placeForm.canonical_name.trim(),
-      latitude,
-      longitude,
-    })
-
-    if (placeError) {
-      setIsSavingPlace(false)
-      setPlaceError(placeError.message)
-      return
-    }
-
-    const { data: updatedPlace, error: reloadError } = await fetchPlaceById(place.id)
-    if (reloadError) {
-      setIsSavingPlace(false)
-      setPlaceError('Modifiche salvate, ma non è stato possibile ricaricare il luogo.')
-      return
-    }
-
-    onPlaceUpdated?.(updatedPlace)
-    setIsSavingPlace(false)
-    setIsEditingPlace(false)
-  }
-
-  async function handleCreateLayer() {
-    setPlaceError('')
-
-    const startYear = Number(newLayerForm.start_year)
-    const endYear = Number(newLayerForm.end_year)
-    const resolvedPeriodId = resolvePeriodId(newLayerForm.period_id)
-
-    if (!newLayerForm.title.trim() || !newLayerForm.short_description.trim() || !newLayerForm.long_description.trim()) {
-      setPlaceError('Compila il titolo del livello, la descrizione breve e la descrizione estesa.')
-      return
-    }
-
-    if (!newLayerForm.period_id || resolvedPeriodId == null) {
-      setPlaceError('Seleziona un periodo storico valido per il nuovo livello.')
-      return
-    }
-
-    if (Number.isNaN(startYear) || Number.isNaN(endYear)) {
-      setPlaceError('Anno inizio e anno fine devono essere numeri validi per il nuovo livello.')
-      return
-    }
-
-    if (startYear > endYear) {
-      setPlaceError("L'anno di inizio deve essere minore o uguale all'anno di fine.")
-      return
-    }
-
-    if (newLayerImages.some((image) => image.file.size > MAX_IMAGE_SIZE)) {
-      setPlaceError('Una o più immagini del nuovo livello sono troppo grandi.')
-      return
-    }
-
-    setIsCreatingLayer(true)
-
-    const { data: layerData, error: layerError } = await createHistoricalLayer({
-      place_id: place.id,
-      historical_period_id: resolvedPeriodId,
-      title: newLayerForm.title.trim(),
-      short_description: newLayerForm.short_description.trim(),
-      long_description: newLayerForm.long_description.trim(),
-      start_year: startYear,
-      end_year: endYear,
-      marker_color: newLayerForm.marker_color || '#38bdf8',
-      marker_icon: newLayerForm.marker_icon?.trim() || null,
-    })
-
-    if (layerError) {
-      setIsCreatingLayer(false)
-      setPlaceError(layerError.message || 'Errore durante la creazione del livello storico.')
-      return
-    }
-
-    if (layerData?.id && newLayerImages.length) {
-      const { payloads, error: uploadError } = await uploadImages({
-        images: newLayerImages,
-        layerId: layerData.id,
-        placeId: place.id,
+    return layers
+      .flatMap((layer) => layer.place_images ?? [])
+      .sort((a, b) => Number(Boolean(b.is_primary)) - Number(Boolean(a.is_primary)))
+      .filter((image) => {
+        const key = imageUrl(image)
+        if (!key || seen.has(key)) return false
+        seen.add(key)
+        return true
       })
+  }, [layers])
+  const tags = place?.place_tags?.map((entry) => entry.tags).filter(Boolean) ?? []
+  const podcasts = activeLayer?.place_podcast_episodes?.map((entry) => entry.podcast_episodes).filter(Boolean) ?? []
+  const notes = activeLayer?.notes ?? []
 
-      if (uploadError) {
-        setIsCreatingLayer(false)
-        setPlaceError(uploadError.message || 'Errore durante il caricamento delle immagini.')
-        return
-      }
+  if (!place || !activeLayer) return null
 
-      if (payloads.length) {
-        const { error: insertError } = await insertLayerImage(payloads)
-        if (insertError) {
-          setIsCreatingLayer(false)
-          setPlaceError('Il livello è stato creato, ma non è stato possibile collegare le immagini.')
-          return
-        }
-      }
-    }
+  if (mode === 'edit') {
+    return (
+      <aside className="place-panel is-editing">
+        <PlaceEditor
+          place={place}
+          layer={activeLayer}
+          periods={periods}
+          onCancel={() => setMode('view')}
+          onSaved={(updated) => {
+            onPlaceUpdated(updated)
+            const updatedLayer = updated.place_historical_layers?.find((layer) => layer.id === activeLayer.id)
+            if (updatedLayer) onSelectLayer(updatedLayer)
+            setMode('view')
+          }}
+        />
+      </aside>
+    )
+  }
 
-    const { data: updatedPlace, error: reloadError } = await fetchPlaceById(place.id)
-    if (reloadError) {
-      setIsCreatingLayer(false)
-      setPlaceError('Livello creato, ma non è stato possibile ricaricare il luogo.')
-      return
-    }
-
-    onPlaceUpdated?.(updatedPlace)
-    onSelectLayer?.(layerData)
-    setNewLayerForm(initialNewLayerForm)
-    cleanupImages(newLayerImages)
-    setNewLayerImages([])
-    setNewLayerUrlInput('')
-    setNewLayerUrlError('')
-    setIsAddingLayer(false)
-    setIsCreatingLayer(false)
+  if (mode === 'new-layer') {
+    return (
+      <aside className="place-panel is-editing">
+        <NewLayerForm
+          place={place}
+          periods={periods}
+          onCancel={() => setMode('view')}
+          onCreated={(updated, layer) => {
+            onPlaceUpdated(updated)
+            onSelectLayer(layer)
+            setMode('view')
+          }}
+        />
+      </aside>
+    )
   }
 
   return (
-    <aside className="pointer-events-auto flex w-full max-w-xl flex-col rounded-3xl border border-slate-800/80 bg-slate-950/90 p-6 shadow-2xl backdrop-blur lg:h-full lg:max-h-full lg:overflow-y-auto lg:overscroll-contain lg:touch-pan-y">
-      <div className="sticky top-0 z-10 -mx-6 -mt-6 mb-4 flex items-start justify-between gap-4 border-b border-slate-800/70 bg-slate-950/95 px-6 pt-6 pb-4 backdrop-blur">
-        <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/70">Scheda luogo</p>
-          <h2 className="mt-2 text-2xl font-semibold text-white">
-            {place.canonical_name ?? 'Luogo storico'}
-          </h2>
-          {activeLayer?.title ? (
-            <p className="mt-1 text-sm text-slate-400">Layer attivo: {activeLayer.title}</p>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            aria-label="Chiudi dettagli luogo"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-800 text-slate-200 transition hover:border-cyan-400/40 hover:text-white"
-            type="button"
-            onClick={onClose}
-          >
-            <CloseIcon />
-          </button>
-        </div>
-      </div>
-
-      <div className="mt-5 space-y-6 pr-1 lg:pb-6">
-        {placeError ? (
-          <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200" role="alert">
-            {placeError}
-          </div>
-        ) : null}
-
-        <section className="rounded-3xl border border-slate-800/80 bg-slate-950/80 p-5 shadow-lg">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/70">Dati luogo</p>
-            </div>
+    <>
+      <aside className="place-panel">
+        <div className="place-panel-topbar">
+          <span className="place-panel-kicker">Scheda luogo</span>
+          <div>
             {canEdit ? (
-              <button
-                type="button"
-                onClick={() => setIsEditingPlace((current) => !current)}
-                className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 px-3 py-2 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-400/10"
-              >
-                {isEditingPlace ? 'Annulla' : 'Modifica'}
+              <button type="button" onClick={() => setMode('edit')} aria-label="Modifica luogo">
+                <Pencil />
               </button>
             ) : null}
+            <button type="button" onClick={onClose} aria-label="Chiudi scheda">
+              <X />
+            </button>
+          </div>
+        </div>
+
+        <div className="place-panel-scroll">
+          <Gallery images={gallery} placeName={place.canonical_name} onOpen={setLightboxIndex} />
+
+          <div className="place-panel-intro">
+            <div className="place-panel-location"><MapPin /> Lecco e territorio</div>
+            <h2>{activeLayer.title || place.canonical_name}</h2>
+            {activeLayer.title !== place.canonical_name ? <p className="place-panel-canonical">{place.canonical_name}</p> : null}
+            <p>{activeLayer.short_description}</p>
           </div>
 
-          {isEditingPlace ? (
-            <div className="mt-4 space-y-4">
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-200">Nome canonico</span>
-                <input
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                  name="canonical_name"
-                  value={placeForm.canonical_name}
-                  onChange={updatePlaceField}
-                />
-              </label>
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-slate-200">Latitudine</span>
-                  <input
-                    className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                    name="latitude"
-                    type="number"
-                    step="any"
-                    value={placeForm.latitude}
-                    onChange={updatePlaceField}
-                  />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-slate-200">Longitudine</span>
-                  <input
-                    className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                    name="longitude"
-                    type="number"
-                    step="any"
-                    value={placeForm.longitude}
-                    onChange={updatePlaceField}
-                  />
-                </label>
-              </div>
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-200">Selettore coordinate</span>
-                <CoordinatePicker
-                  value={{
-                    latitude: placeForm.latitude ? Number(placeForm.latitude) : null,
-                    longitude: placeForm.longitude ? Number(placeForm.longitude) : null,
-                  }}
-                  onChange={updateCoordinates}
-                />
-              </label>
-              <button
-                className="inline-flex items-center justify-center rounded-full bg-cyan-400 px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={isSavingPlace}
-                type="button"
-                onClick={handleSavePlace}
-              >
-                {isSavingPlace ? 'Salvataggio…' : 'Salva dati luogo'}
-              </button>
-            </div>
-          ) : (
-            <div className="mt-4 grid gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-sm">
+          {layers.length > 1 ? (
+            <div className="place-layer-picker">
+              <span>Attraversa le epoche</span>
               <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Coordinate</p>
-                <p className="mt-1 text-slate-200">
-                  {place.latitude}, {place.longitude}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {placeGallery.length ? (
-            <div className="mt-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Galleria</p>
-              <div className="mt-3 flex gap-3 overflow-x-auto pb-2">
-                {placeGallery.map((image) => (
-                  <img
-                    key={image.id}
-                    alt={image.caption || place.canonical_name || 'Immagine luogo'}
-                    className="h-24 w-36 flex-shrink-0 rounded-2xl object-cover"
-                    src={image.thumbnail_url || image.image_url}
-                  />
+                {layers.map((layer) => (
+                  <button
+                    key={layer.id}
+                    className={layer.id === activeLayer.id ? 'is-active' : ''}
+                    type="button"
+                    onClick={() => onSelectLayer(layer)}
+                  >
+                    <span>{formatYear(layer.start_year)}</span>
+                    <strong>{layer.title}</strong>
+                  </button>
                 ))}
               </div>
             </div>
           ) : null}
 
-          {canEdit ? <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button
-              className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 px-4 py-2 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-400/10"
-              type="button"
-              onClick={onToggleVisited}
-            >
-              <TimelineIcon className="h-4 w-4" />
-              {place.visited ? 'Visitato' : 'Non visitato'}
-            </button>
-          </div> : null}
-        </section>
-
-        <section className="space-y-5">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/70">Livelli storici</p>
+          <div className="place-facts">
+            <div><Clock3 /><span>Periodo</span><strong>{activeLayer.historical_periods?.name || 'Non indicato'}</strong></div>
+            <div><BookOpen /><span>Cronologia</span><strong>{formatYear(activeLayer.start_year)} — {formatYear(activeLayer.end_year)}</strong></div>
           </div>
-          <div className="space-y-6">
-            {layers.map((layer) => (
-              <LayerSection
-                key={layer.id}
-                place={place}
-                layer={layer}
-                periods={periods}
-                isActive={activeLayer?.id === layer.id}
-                onSelectLayer={onSelectLayer}
-                onPlaceUpdated={onPlaceUpdated}
-                canEdit={canEdit}
-              />
-            ))}
-          </div>
-        </section>
 
-        {canEdit ? <section className="rounded-3xl border border-slate-800/80 bg-slate-950/80 p-5 shadow-lg">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-cyan-300/70">Nuovo livello storico</p>
-              <p className="mt-1 text-xs text-slate-400">
-                Aggiungi un periodo storico per questo luogo.
-              </p>
+          {tags.length ? (
+            <div className="place-tags">
+              {tags.map((tag) => <span key={tag.id}>{tag.name}</span>)}
             </div>
-            <button
-              type="button"
-              onClick={() => setIsAddingLayer((current) => !current)}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-cyan-400/40 hover:text-white"
-            >
-              <AddIcon className="h-4 w-4" />
-              {isAddingLayer ? 'Annulla' : 'Aggiungi'}
-            </button>
-          </div>
+          ) : null}
 
-          {isAddingLayer ? (
-            <div className="mt-4 space-y-4">
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-200">Titolo livello storico</span>
-                <input
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                  name="title"
-                  value={newLayerForm.title}
-                  onChange={updateNewLayerField}
-                />
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-200">Descrizione breve</span>
-                <textarea
-                  className="min-h-24 w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                  name="short_description"
-                  value={newLayerForm.short_description}
-                  onChange={updateNewLayerField}
-                />
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-200">Descrizione estesa</span>
-                <textarea
-                  className="min-h-28 w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                  name="long_description"
-                  value={newLayerForm.long_description}
-                  onChange={updateNewLayerField}
-                />
-              </label>
+          {activeLayer.long_description ? (
+            <section className="place-story">
+              <span className="place-panel-kicker">La storia</span>
+              <p>{activeLayer.long_description}</p>
+            </section>
+          ) : null}
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-slate-200">Anno inizio</span>
-                  <input
-                    className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                    name="start_year"
-                    type="number"
-                    value={newLayerForm.start_year}
-                    onChange={updateNewLayerField}
-                  />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-slate-200">Anno fine</span>
-                  <input
-                    className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                    name="end_year"
-                    type="number"
-                    value={newLayerForm.end_year}
-                    onChange={updateNewLayerField}
-                  />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-slate-200">Colore marker</span>
-                  <input
-                    className="h-12 w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-2 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                    name="marker_color"
-                    type="color"
-                    value={newLayerForm.marker_color}
-                    onChange={updateNewLayerField}
-                  />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-slate-200">Icona marker (opzionale)</span>
-                  <input
-                    className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                    name="marker_icon"
-                    value={newLayerForm.marker_icon}
-                    onChange={updateNewLayerField}
-                  />
-                </label>
-              </div>
+          {podcasts.length ? (
+            <section className="place-related">
+              <span className="place-panel-kicker"><Headphones /> Ascolta</span>
+              {podcasts.map((episode) => (
+                <article key={episode.id}><h3>{episode.title}</h3><p>{episode.short_description}</p></article>
+              ))}
+            </section>
+          ) : null}
 
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-200">Periodo storico</span>
-                <select
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                  name="period_id"
-                  value={newLayerForm.period_id}
-                  onChange={updateNewLayerField}
-                >
-                  <option value="">Seleziona un periodo</option>
-                  {periods.map((periodItem) => (
-                    <option key={periodItem.id} value={periodItem.id}>
-                      {periodItem.name} ({periodItem.start_year} → {periodItem.end_year})
-                    </option>
-                  ))}
-                </select>
-              </label>
+          {notes.length ? (
+            <section className="place-related">
+              <span className="place-panel-kicker"><BookOpen /> Approfondisci</span>
+              {notes.map((note) => (
+                <article key={note.id}><h3>{note.title}</h3>{note.content ? <p>{note.content}</p> : null}</article>
+              ))}
+            </section>
+          ) : null}
 
-              <div className="space-y-4">
-                <div className="rounded-3xl border border-slate-800 bg-slate-950/60 p-4">
-                  <p className="text-sm font-medium text-slate-200">Aggiungi immagine da link</p>
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <input
-                      className="flex-1 rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-2.5 text-sm text-slate-100 outline-none transition focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20"
-                      placeholder="https://..."
-                      value={newLayerUrlInput}
-                      onChange={(event) => setNewLayerUrlInput(event.target.value)}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddNewLayerImageUrl}
-                      className="rounded-full bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
-                    >
-                      Aggiungi link
-                    </button>
-                  </div>
-                  {newLayerUrlError ? (
-                    <p className="mt-2 text-xs text-rose-300">{newLayerUrlError}</p>
-                  ) : null}
-                </div>
-
-                <ImageUploader
-                  disabled={isCreatingLayer}
-                  images={newLayerImages}
-                  onAddFiles={validateAndAddNewLayerFiles}
-                  onMarkPrimary={markPrimaryNewLayerImage}
-                  onRemoveImage={removeNewLayerImage}
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={handleCreateLayer}
-                disabled={isCreatingLayer}
-                className="inline-flex items-center justify-center rounded-full bg-cyan-400 px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isCreatingLayer ? 'Salvataggio…' : 'Crea livello'}
+          {canEdit ? (
+            <div className="place-admin-actions">
+              <button type="button" onClick={onToggleVisited}>
+                <Check /> {place.visited ? 'Segnato come visitato' : 'Segna come visitato'}
+              </button>
+              <button type="button" onClick={() => setMode('new-layer')}>
+                <Plus /> Aggiungi livello storico
+              </button>
+              <button type="button" onClick={() => setMode('edit')}>
+                <Upload /> Gestisci dati e immagini
               </button>
             </div>
           ) : null}
-        </section> : null}
-      </div>
-    </aside>
+        </div>
+      </aside>
+
+      {lightboxIndex != null ? (
+        <Lightbox
+          images={gallery}
+          index={lightboxIndex}
+          placeName={place.canonical_name}
+          onClose={() => setLightboxIndex(null)}
+          onChange={setLightboxIndex}
+        />
+      ) : null}
+    </>
   )
 }
 
