@@ -29,14 +29,33 @@ function ParallaxHero() {
       frameId = null
       const bounds = section.getBoundingClientRect()
       const sticky = section.querySelector('.parallax-hero-sticky')
+      const actions = section.querySelector('.hero-actions')
       const stickyHeight = sticky?.clientHeight ?? window.innerHeight
+      const stickyBounds = sticky?.getBoundingClientRect()
       const distance = Math.max(section.offsetHeight - stickyHeight, 1)
       const progress = reduceMotion.matches
         ? 1
         : Math.min(Math.max(-bounds.top / distance, 0), 1)
       const assemblyProgress = Math.min(progress / 0.68, 1)
+      const actionsHeight = actions?.offsetHeight ?? 0
+      const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
+      const pinnedTop = window.innerWidth <= 540
+        ? window.innerHeight - 8.25 * rootFontSize
+        : window.innerWidth <= 900
+          ? window.innerHeight - 4.65 * rootFontSize
+          : window.innerHeight - Math.min(
+            Math.max(window.innerHeight * 0.1, 5.15 * rootFontSize),
+            7.65 * rootFontSize,
+          )
+      const actionsTop = Math.min(
+        pinnedTop,
+        (stickyBounds?.bottom ?? 0) - actionsHeight - 80,
+      )
+      const pinActions = progress >= 0.86 && actionsTop + actionsHeight > 0
 
       section.style.setProperty('--hero-progress', progress.toFixed(4))
+      section.style.setProperty('--hero-actions-top', `${actionsTop}px`)
+      section.classList.toggle('has-pinned-actions', pinActions)
       parallaxLayers.forEach((layer, index) => {
         section.style.setProperty(
           `--layer-${index}-y`,
@@ -60,6 +79,7 @@ function ParallaxHero() {
       window.removeEventListener('scroll', requestUpdate)
       window.removeEventListener('resize', requestUpdate)
       reduceMotion.removeEventListener('change', requestUpdate)
+      section.classList.remove('has-pinned-actions')
       if (frameId !== null) {
         window.cancelAnimationFrame(frameId)
       }

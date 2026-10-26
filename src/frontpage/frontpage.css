@@ -185,6 +185,7 @@
 
 .parallax-hero {
   --hero-progress: 0;
+  --hero-actions-top: calc(100svh - clamp(5.15rem, 10vh, 7.65rem));
   position: relative;
   height: 340vh;
   min-height: 1800px;
@@ -244,6 +245,11 @@
   gap: 0.8rem;
   opacity: clamp(0, calc((var(--hero-progress) - 0.86) * 7.15), 1);
   transform: translate(-50%, calc((1 - var(--hero-progress)) * 4rem));
+}
+
+.parallax-hero.has-pinned-actions .hero-actions {
+  position: fixed;
+  top: var(--hero-actions-top);
 }
 
 .frontpage-button {
