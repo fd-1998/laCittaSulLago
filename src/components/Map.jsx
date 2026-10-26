@@ -26,7 +26,7 @@ function Map({ markers = [], onSelectPlace, activePlaceId }) {
 
     const map = L.map(mapContainerRef.current, {
       center: DEFAULT_CENTER,
-      zoom: 11,
+      zoom: 13,
       zoomControl: false,
     })
     L.control.zoom({ position: 'bottomright' }).addTo(map)

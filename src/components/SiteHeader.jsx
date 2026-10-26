@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ArrowRight, LogOut, Menu, X } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
-import logo from '../assets/logo.png'
+import logo from '../assets/logo_horizontal.png'
 import { useAuth } from '../context/AuthContext'
 
 const sectionLinks = [
@@ -19,9 +19,8 @@ function SiteHeader() {
   return (
     <header className={`site-header ${isFrontPage ? 'site-header-overlay' : 'site-header-solid'}`}>
       <div className="site-header-inner">
-        <Link className="frontpage-brand" to="/" aria-label="La Città sul Lago, home">
+        <Link className="frontpage-brand site-header-brand" to="/" aria-label="La Città sul Lago, home">
           <img src={logo} alt="" />
-          <span>La Città sul Lago</span>
         </Link>
 
         <nav className="frontpage-nav" aria-label="Navigazione principale">

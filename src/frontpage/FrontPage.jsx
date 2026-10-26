@@ -6,13 +6,12 @@ import layerBackground from '../assets/frontpage/parallax/layer 0 - sfondo.png'
 import layerMountains from '../assets/frontpage/parallax/layer 1.png'
 import layerCity from '../assets/frontpage/parallax/layer 2.png'
 import layerShore from '../assets/frontpage/parallax/layer 3.png'
-import layerTitle from '../assets/frontpage/parallax/layer 4 - titolo.png'
 import { frontpageThemeVariables } from './theme'
 import { siteContacts } from './siteConfig'
 import './frontpage.css'
 
 const parallaxLayers = [
-  { src: layerBackground, alt: '', start: -8 },
+  { src: layerBackground, alt: '', start: 0 },
   { src: layerMountains, alt: '', start: 16 },
   { src: layerCity, alt: '', start: 34 },
   { src: layerShore, alt: '', start: 50 },
@@ -29,14 +28,20 @@ function ParallaxHero() {
     const updateProgress = () => {
       frameId = null
       const bounds = section.getBoundingClientRect()
-      const distance = Math.max(section.offsetHeight - window.innerHeight, 1)
+      const sticky = section.querySelector('.parallax-hero-sticky')
+      const stickyHeight = sticky?.clientHeight ?? window.innerHeight
+      const distance = Math.max(section.offsetHeight - stickyHeight, 1)
       const progress = reduceMotion.matches
         ? 1
         : Math.min(Math.max(-bounds.top / distance, 0), 1)
+      const assemblyProgress = Math.min(progress / 0.68, 1)
 
       section.style.setProperty('--hero-progress', progress.toFixed(4))
       parallaxLayers.forEach((layer, index) => {
-        section.style.setProperty(`--layer-${index}-y`, `${layer.start * (1 - progress)}vh`)
+        section.style.setProperty(
+          `--layer-${index}-y`,
+          `${layer.start * (1 - assemblyProgress)}vh`,
+        )
       })
     }
 
@@ -73,7 +78,6 @@ function ParallaxHero() {
               alt={layer.alt}
             />
           ))}
-          <img className="parallax-title-layer" src={layerTitle} alt="" />
         </div>
 
         <div className="hero-accessible-title">
