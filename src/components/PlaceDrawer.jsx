@@ -65,6 +65,8 @@ function SafeImage({ src, alt }) {
 }
 
 function Gallery({ images, placeName, onOpen }) {
+  const [index, setIndex] = useState(0)
+
   if (!images.length) {
     return (
       <div className="place-panel-empty">
@@ -74,17 +76,40 @@ function Gallery({ images, placeName, onOpen }) {
     )
   }
 
+  const visibleIndex = Math.min(index, images.length - 1)
+  const image = images[visibleIndex]
+
   return (
-    <div className={`place-gallery-grid ${images.length === 1 ? 'is-single' : ''}`}>
-      {images.slice(0, 5).map((image, index) => (
-        <button key={image.id ?? imageUrl(image)} type="button" onClick={() => onOpen(index)}>
-          <SafeImage src={image.thumbnail_url || image.image_url} alt={image.caption || placeName} />
-          {index === 4 && images.length > 5 ? (
-            <span className="place-gallery-more">+{images.length - 5}</span>
-          ) : null}
-          <Expand aria-hidden="true" />
-        </button>
-      ))}
+    <div className="place-gallery">
+      <button className="place-gallery-image" type="button" onClick={() => onOpen(visibleIndex)}>
+        <SafeImage
+          key={imageUrl(image)}
+          src={image.thumbnail_url || image.image_url}
+          alt={image.caption || placeName}
+        />
+        <Expand aria-hidden="true" />
+      </button>
+      {images.length > 1 ? (
+        <>
+          <button
+            className="place-gallery-arrow is-left"
+            type="button"
+            onClick={() => setIndex((current) => (current - 1 + images.length) % images.length)}
+            aria-label="Immagine precedente"
+          >
+            <ChevronLeft />
+          </button>
+          <button
+            className="place-gallery-arrow is-right"
+            type="button"
+            onClick={() => setIndex((current) => (current + 1) % images.length)}
+            aria-label="Immagine successiva"
+          >
+            <ChevronRight />
+          </button>
+          <span className="place-gallery-count">{visibleIndex + 1} / {images.length}</span>
+        </>
+      ) : null}
     </div>
   )
 }
@@ -556,6 +581,7 @@ function PlaceDrawer({
 }) {
   const { canEdit } = useAuth()
   const [mode, setMode] = useState('view')
+  const [editingLayer, setEditingLayer] = useState(activeLayer)
   const [lightboxIndex, setLightboxIndex] = useState(null)
   const layers = useMemo(
     () => [...(place?.place_historical_layers ?? [])].sort((a, b) => Number(a.start_year) - Number(b.start_year)),
@@ -574,22 +600,20 @@ function PlaceDrawer({
       })
   }, [layers])
   const tags = place?.place_tags?.map((entry) => entry.tags).filter(Boolean) ?? []
-  const podcasts = activeLayer?.place_podcast_episodes?.map((entry) => entry.podcast_episodes).filter(Boolean) ?? []
-  const notes = activeLayer?.notes ?? []
 
-  if (!place || !activeLayer) return null
+  if (!place) return null
 
-  if (mode === 'edit') {
+  if (mode === 'edit' && editingLayer) {
     return (
       <aside className="place-panel is-editing">
         <PlaceEditor
           place={place}
-          layer={activeLayer}
+          layer={editingLayer}
           periods={periods}
           onCancel={() => setMode('view')}
           onSaved={(updated) => {
             onPlaceUpdated(updated)
-            const updatedLayer = updated.place_historical_layers?.find((layer) => layer.id === activeLayer.id)
+            const updatedLayer = updated.place_historical_layers?.find((layer) => layer.id === editingLayer.id)
             if (updatedLayer) onSelectLayer(updatedLayer)
             setMode('view')
           }}
@@ -621,8 +645,15 @@ function PlaceDrawer({
         <div className="place-panel-topbar">
           <span className="place-panel-kicker">Scheda luogo</span>
           <div>
-            {canEdit ? (
-              <button type="button" onClick={() => setMode('edit')} aria-label="Modifica luogo">
+            {canEdit && layers.length ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingLayer(activeLayer ?? layers[0])
+                  setMode('edit')
+                }}
+                aria-label="Modifica luogo"
+              >
                 <Pencil />
               </button>
             ) : null}
@@ -633,69 +664,103 @@ function PlaceDrawer({
         </div>
 
         <div className="place-panel-scroll">
-          <Gallery images={gallery} placeName={place.canonical_name} onOpen={setLightboxIndex} />
-
           <div className="place-panel-intro">
             <div className="place-panel-location"><MapPin /> Lecco e territorio</div>
-            <h2>{activeLayer.title || place.canonical_name}</h2>
-            {activeLayer.title !== place.canonical_name ? <p className="place-panel-canonical">{place.canonical_name}</p> : null}
-            <p>{activeLayer.short_description}</p>
-          </div>
-
-          {layers.length > 1 ? (
-            <div className="place-layer-picker">
-              <span>Attraversa le epoche</span>
-              <div>
-                {layers.map((layer) => (
-                  <button
-                    key={layer.id}
-                    className={layer.id === activeLayer.id ? 'is-active' : ''}
-                    type="button"
-                    onClick={() => onSelectLayer(layer)}
-                  >
-                    <span>{formatYear(layer.start_year)}</span>
-                    <strong>{layer.title}</strong>
-                  </button>
-                ))}
+            <h1>{place.canonical_name}</h1>
+            {tags.length ? (
+              <div className="place-tags">
+                {tags.map((tag) => <span key={tag.id}>{tag.name}</span>)}
               </div>
-            </div>
-          ) : null}
-
-          <div className="place-facts">
-            <div><Clock3 /><span>Periodo</span><strong>{activeLayer.historical_periods?.name || 'Non indicato'}</strong></div>
-            <div><BookOpen /><span>Cronologia</span><strong>{formatYear(activeLayer.start_year)} — {formatYear(activeLayer.end_year)}</strong></div>
+            ) : null}
           </div>
 
-          {tags.length ? (
-            <div className="place-tags">
-              {tags.map((tag) => <span key={tag.id}>{tag.name}</span>)}
-            </div>
-          ) : null}
+          <Gallery images={gallery} placeName={place.canonical_name} onOpen={setLightboxIndex} />
 
-          {activeLayer.long_description ? (
-            <section className="place-story">
-              <span className="place-panel-kicker">La storia</span>
-              <p>{activeLayer.long_description}</p>
-            </section>
-          ) : null}
+          <div className="place-periods">
+            {layers.map((layer) => {
+              const podcasts = layer.place_podcast_episodes
+                ?.map((entry) => entry.podcast_episodes)
+                .filter(Boolean) ?? []
+              const notes = layer.notes ?? []
 
-          {podcasts.length ? (
-            <section className="place-related">
-              <span className="place-panel-kicker"><Headphones /> Ascolta</span>
-              {podcasts.map((episode) => (
-                <article key={episode.id}><h3>{episode.title}</h3><p>{episode.short_description}</p></article>
-              ))}
-            </section>
-          ) : null}
+              return (
+                <section className="place-period" key={layer.id}>
+                  <header className="place-period-heading">
+                    <div>
+                      <span className="place-panel-kicker">
+                        {layer.historical_periods?.name || 'Periodo storico'}
+                      </span>
+                      <h2>{layer.title || layer.historical_periods?.name || 'Un’epoca del luogo'}</h2>
+                    </div>
+                    {canEdit ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingLayer(layer)
+                          onSelectLayer(layer)
+                          setMode('edit')
+                        }}
+                        aria-label={`Modifica ${layer.title || 'periodo storico'}`}
+                      >
+                        <Pencil />
+                      </button>
+                    ) : null}
+                  </header>
 
-          {notes.length ? (
-            <section className="place-related">
-              <span className="place-panel-kicker"><BookOpen /> Approfondisci</span>
-              {notes.map((note) => (
-                <article key={note.id}><h3>{note.title}</h3>{note.content ? <p>{note.content}</p> : null}</article>
-              ))}
-            </section>
-          ) : null}
+                  <div className="place-facts">
+                    <div>
+                      <Clock3 />
+                      <span>Periodo</span>
+                      <strong>{layer.historical_periods?.name || 'Non indicato'}</strong>
+                    </div>
+                    <div>
+                      <BookOpen />
+                      <span>Cronologia</span>
+                      <strong>{formatYear(layer.start_year)} — {formatYear(layer.end_year)}</strong>
+                    </div>
+                  </div>
+
+                  {layer.short_description ? <p className="place-period-summary">{layer.short_description}</p> : null}
+
+                  {layer.long_description ? (
+                    <div className="place-story">
+                      <p>{layer.long_description}</p>
+                    </div>
+                  ) : null}
+
+                  {podcasts.length ? (
+                    <div className="place-related">
+                      <span className="place-panel-kicker"><Headphones /> Ascolta</span>
+                      {podcasts.map((episode) => (
+                        <article key={episode.id}>
+                          <h3>{episode.title}</h3>
+                          {episode.short_description ? <p>{episode.short_description}</p> : null}
+                        </article>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {notes.length ? (
+                    <div className="place-related">
+                      <span className="place-panel-kicker"><BookOpen /> Approfondisci</span>
+                      {notes.map((note) => (
+                        <article key={note.id}>
+                          <h3>{note.title}</h3>
+                          {note.content ? <p>{note.content}</p> : null}
+                        </article>
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+              )
+            })}
+            {!layers.length ? (
+              <div className="place-panel-empty">
+                <BookOpen aria-hidden="true" />
+                <span>Nessun periodo storico disponibile.</span>
+              </div>
+            ) : null}
+          </div>
 
           {canEdit ? (
             <div className="place-admin-actions">
@@ -705,9 +770,17 @@ function PlaceDrawer({
               <button type="button" onClick={() => setMode('new-layer')}>
                 <Plus /> Aggiungi livello storico
               </button>
-              <button type="button" onClick={() => setMode('edit')}>
-                <Upload /> Gestisci dati e immagini
-              </button>
+              {layers.length ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingLayer(activeLayer ?? layers[0])
+                    setMode('edit')
+                  }}
+                >
+                  <Upload /> Gestisci dati e immagini
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>

@@ -12,7 +12,8 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 })
 
-const DEFAULT_CENTER = [45.856, 9.391]
+const DEFAULT_CENTER = [45.852574, 9.394918]
+const DEFAULT_ZOOM = 13
 
 function Map({ markers = [], onSelectPlace, activePlaceId }) {
   const mapContainerRef = useRef(null)
@@ -26,7 +27,7 @@ function Map({ markers = [], onSelectPlace, activePlaceId }) {
 
     const map = L.map(mapContainerRef.current, {
       center: DEFAULT_CENTER,
-      zoom: 13,
+      zoom: DEFAULT_ZOOM,
       zoomControl: false,
     })
     L.control.zoom({ position: 'bottomright' }).addTo(map)
@@ -154,25 +155,6 @@ function Map({ markers = [], onSelectPlace, activePlaceId }) {
       marker.addTo(markerLayerRef.current)
     })
 
-    if (markers.length > 0) {
-      const bounds = L.latLngBounds(
-        markers
-          .map((marker) => marker?.place)
-          .filter((place) => place?.latitude != null && place?.longitude != null)
-          .map((place) => [place.latitude, place.longitude]),
-      )
-
-      if (bounds.isValid()) {
-        // ensure container size is up-to-date before fitting bounds
-        try {
-          mapInstanceRef.current.invalidateSize()
-        } catch {
-          // ignore
-        }
-        // small delay so invalidateSize can take effect
-        setTimeout(() => mapInstanceRef.current.fitBounds(bounds.pad(0.2), { animate: false }), 50)
-      }
-    }
   }, [markers, activePlaceId, onSelectPlace])
 
   // full-bleed map: keep the container in-flow so it tracks parent size reliably

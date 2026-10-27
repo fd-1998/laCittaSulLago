@@ -213,12 +213,19 @@
 .parallax-layer {
   position: absolute;
   inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
   pointer-events: none;
   user-select: none;
   will-change: transform, opacity;
+}
+
+.parallax-layer img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .parallax-layer-0 { transform: none; }
@@ -678,8 +685,20 @@
   }
 
   .parallax-hero {
-    height: 310vh;
-    min-height: 1650px;
+    height: 390vh;
+    min-height: 2200px;
+  }
+
+  .parallax-hero-sticky {
+    height: max(calc(100svh - 5rem), 177.7778vw);
+  }
+
+  .parallax-canvas {
+    aspect-ratio: 9 / 16;
+  }
+
+  .parallax-layer img {
+    object-fit: fill;
   }
 
   .hero-scroll-hint {

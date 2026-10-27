@@ -6,15 +6,19 @@ import layerBackground from '../assets/frontpage/parallax/layer 0 - sfondo.png'
 import layerMountains from '../assets/frontpage/parallax/layer 1.png'
 import layerCity from '../assets/frontpage/parallax/layer 2.png'
 import layerShore from '../assets/frontpage/parallax/layer 3.png'
+import mobileLayerBackground from '../assets/frontpage/parallax_phone/layer 0 - sfondo.png'
+import mobileLayerMountains from '../assets/frontpage/parallax_phone/layer 1.png'
+import mobileLayerCity from '../assets/frontpage/parallax_phone/layer 2.png'
+import mobileLayerShore from '../assets/frontpage/parallax_phone/layer 3.png'
 import { frontpageThemeVariables } from './theme'
 import { siteContacts } from './siteConfig'
 import './frontpage.css'
 
 const parallaxLayers = [
-  { src: layerBackground, alt: '', start: 0 },
-  { src: layerMountains, alt: '', start: 16 },
-  { src: layerCity, alt: '', start: 34 },
-  { src: layerShore, alt: '', start: 50 },
+  { src: layerBackground, mobileSrc: mobileLayerBackground, alt: '', start: 0 },
+  { src: layerMountains, mobileSrc: mobileLayerMountains, alt: '', start: 16 },
+  { src: layerCity, mobileSrc: mobileLayerCity, alt: '', start: 34 },
+  { src: layerShore, mobileSrc: mobileLayerShore, alt: '', start: 50 },
 ]
 
 function ParallaxHero() {
@@ -91,12 +95,10 @@ function ParallaxHero() {
       <div className="parallax-hero-sticky">
         <div className="parallax-canvas" aria-hidden="true">
           {parallaxLayers.map((layer, index) => (
-            <img
-              key={layer.src}
-              className={`parallax-layer parallax-layer-${index}`}
-              src={layer.src}
-              alt={layer.alt}
-            />
+            <picture key={layer.src} className={`parallax-layer parallax-layer-${index}`}>
+              <source media="(max-width: 820px)" srcSet={layer.mobileSrc} />
+              <img src={layer.src} alt={layer.alt} />
+            </picture>
           ))}
         </div>
 
