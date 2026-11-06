@@ -204,22 +204,7 @@ function HomeMap() {
             </label>
           </div>
 
-          <div className="gis-results-heading">
-            <span>{filteredPlaces.length} luoghi</span>
-            {(selectedItinerary !== 'all' || selectedPeriodId !== 'all' || query) ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setQuery('')
-                  setSelectedItinerary('all')
-                  setSelectedPeriodId('all')
-                }}
-              >
-                Azzera filtri
-              </button>
-            ) : null}
-          </div>
-
+          
           <div className="gis-results">
             {loading ? <div className="gis-status">Caricamento dei luoghi…</div> : null}
             {error ? (
@@ -262,11 +247,6 @@ function HomeMap() {
           activePlaceId={selectedPlace?.id}
           onSelectPlace={selectPlace}
         />
-
-        <div className="gis-map-badge">
-          <MapPin />
-          <span><strong>{filteredPlaces.length}</strong> luoghi sulla mappa</span>
-        </div>
 
         <button className="gis-mobile-filter-button" type="button" onClick={() => setMobileFiltersOpen(true)}>
           <Filter /> Filtri
