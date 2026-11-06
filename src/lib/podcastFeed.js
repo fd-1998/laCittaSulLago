@@ -1,5 +1,3 @@
-import { podcastFeedUrl } from '../frontpage/siteConfig'
-
 function textFromHtml(html) {
   const document = new DOMParser().parseFromString(html || '', 'text/html')
   return document.body.textContent?.replace(/\s+/g, ' ').trim() ?? ''
@@ -13,8 +11,8 @@ function getNamespacedText(node, localName) {
   return Array.from(node.children).find((child) => child.localName === localName)?.textContent?.trim() ?? ''
 }
 
-export async function fetchPodcastFeed(signal) {
-  const response = await fetch(podcastFeedUrl, { signal })
+export async function fetchPodcastFeed(feedUrl, signal) {
+  const response = await fetch(feedUrl, { signal })
   if (!response.ok) {
     throw new Error(`Il feed podcast ha risposto con stato ${response.status}.`)
   }

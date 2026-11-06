@@ -1,6 +1,5 @@
 import { CalendarDays, Clock3, ExternalLink, Headphones, Radio } from 'lucide-react'
 import usePodcastsData from '../hooks/usePodcastsData'
-import { siteContacts } from '../frontpage/siteConfig'
 
 function formatDate(value) {
   if (!value) {
@@ -15,10 +14,32 @@ function formatDate(value) {
 }
 
 function PodcastsPage() {
-  const { podcast, episodes, loading, error } = usePodcastsData()
+  const {
+    podcasts,
+    selectedSlug,
+    selectPodcast,
+    podcast,
+    episodes,
+    loading,
+    error,
+  } = usePodcastsData()
 
   return (
     <main className="podcast-page">
+      {podcasts.length > 1 ? (
+        <nav className="podcast-series-picker" aria-label="Serie podcast">
+          {podcasts.map((series) => (
+            <button
+              aria-current={series.slug === selectedSlug ? 'page' : undefined}
+              key={series.id}
+              onClick={() => selectPodcast(series.slug)}
+              type="button"
+            >
+              {series.shortTitle}
+            </button>
+          ))}
+        </nav>
+      ) : null}
       <section className="podcast-page-hero">
         <div className="podcast-cover-wrap">
           {podcast?.image ? <img src={podcast.image} alt={`Copertina di ${podcast.title}`} /> : null}
@@ -30,9 +51,11 @@ function PodcastsPage() {
           <p className="podcast-intro">
             {podcast?.description || 'La storia di Lecco raccontata da chi la abita, episodio dopo episodio.'}
           </p>
-          <a className="app-primary-button" href={siteContacts.spotify.href} target="_blank" rel="noreferrer">
-            Segui su Spotify <ExternalLink aria-hidden="true" />
-          </a>
+          {podcast?.spotifyUrl ? (
+            <a className="app-primary-button" href={podcast.spotifyUrl} target="_blank" rel="noreferrer">
+              Segui su Spotify <ExternalLink aria-hidden="true" />
+            </a>
+          ) : null}
         </div>
       </section>
 

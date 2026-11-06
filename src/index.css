@@ -1375,6 +1375,33 @@
       color: #15394d;
     }
 
+    .podcast-series-picker {
+      display: flex;
+      gap: 0.75rem;
+      overflow-x: auto;
+      padding: 1rem max(1.5rem, calc((100vw - 1180px) / 2));
+      background: #fff9f0;
+    }
+
+    .podcast-series-picker button {
+      flex: 0 0 auto;
+      padding: 0.65rem 1rem;
+      border: 1px solid rgb(21 57 77 / 18%);
+      border-radius: 999px;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .podcast-series-picker button[aria-current='page'] {
+      border-color: #15394d;
+      background: #15394d;
+      color: #fff9f0;
+    }
+
     .podcast-page-hero {
       display: grid;
       grid-template-columns: minmax(240px, 390px) minmax(0, 1fr);
