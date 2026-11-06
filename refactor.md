@@ -123,6 +123,23 @@ Produrre `docs/database-verification.md` con risultati, anomalie e azioni corret
 
 Non modificare o ricreare il database per correggere problemi senza aver prima documentato la discrepanza e predisposto un backup.
 
+### 5.1 Gestione multi-podcast
+
+Il frontend richiede una risorsa persistente per le serie podcast e per l'ordine editoriale
+degli episodi RSS. Il backend deve prevedere:
+
+- una tabella `podcasts` con almeno `id`, `slug`, `title`, `short_title`, `description`,
+  `feed_url`, `spotify_url`, `image_url`, `created_at` e `updated_at`;
+- una tabella `podcast_episode_order` con `podcast_id`, `episode_guid` e `position`,
+  con unicità su `(podcast_id, episode_guid)` e `(podcast_id, position)`;
+- `GET /api/podcasts` e `GET /api/podcasts/:slug` pubblici;
+- `GET`, `POST` e `PATCH /api/admin/podcasts` riservati agli amministratori;
+- `PUT /api/admin/podcasts/:id/episode-order` riservato agli amministratori, con payload
+  `{ "episodeIds": ["guid-1", "guid-2"] }`.
+
+Il server deve validare URL, slug univoci e appartenenza degli identificativi al feed indicato.
+Il riordino deve essere transazionale e non deve alterare la data di pubblicazione degli episodi.
+
 ### 6. Fase C — Progettazione dell'API REST
 
 Completare il backend Express esistente, preferendo un'architettura semplice e manutenibile:

@@ -1,5 +1,3 @@
-export const podcastFeedUrl = 'https://anchor.fm/s/112cfc4bc/podcast/rss'
-
 export const siteContacts = {
   email: {
     label: 'lacittasullago@gmail.com',

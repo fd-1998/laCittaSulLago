@@ -2,7 +2,8 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import AddPlace from './pages/AddPlace'
 import HomeMap from './pages/HomeMap'
 import NotesPage from './pages/NotesPage'
-import PodcastsPage from './pages/PodcastsPage'
+import PodcastsPage, { PodcastsIndexPage } from './pages/PodcastsPage'
+import PodcastsAdminPage from './pages/PodcastsAdminPage'
 import PlaceDetail from './pages/PlaceDetail'
 import TimelinePage from './pages/TimelinePage'
 import DatabaseDump from './pages/DatabaseDump'
@@ -29,7 +30,9 @@ function App() {
         <Route path="/" element={<FrontPage />} />
         <Route path="/mappa" element={<HomeMap />} />
         <Route path="/timeline" element={<TimelinePage />} />
-        <Route path="/podcasts" element={<PodcastsPage />} />
+        <Route path="/podcasts" element={<PodcastsIndexPage />} />
+        <Route path="/podcasts/:podcastSlug" element={<PodcastsPage />} />
+        <Route path="/admin/podcasts" element={<ProtectedRoute admin><PodcastsAdminPage /></ProtectedRoute>} />
         <Route path="/notes" element={<NotesPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/database" element={<ProtectedRoute><DatabaseDump /></ProtectedRoute>} />

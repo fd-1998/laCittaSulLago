@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { usePodcastCatalog } from '../hooks/usePodcastsData'
 import {
   AddIcon,
   HomeIcon,
@@ -22,6 +23,7 @@ const publicLinks = [
 export default function MobileMenu() {
   const [isOpen, setIsOpen] = useState(false)
   const { user, canEdit, isAdmin, logout } = useAuth()
+  const { podcasts } = usePodcastCatalog()
   const mobileLinks = [
     ...publicLinks,
     ...(canEdit ? [
@@ -29,6 +31,7 @@ export default function MobileMenu() {
       { to: '/add-location', label: 'Aggiungi', icon: AddIcon },
     ] : []),
     ...(isAdmin ? [{ to: '/admin/users', label: 'Collaboratori', icon: DatabaseIcon }] : []),
+    ...(isAdmin ? [{ to: '/admin/podcasts', label: 'Gestione podcast', icon: PodcastsIcon }] : []),
   ]
 
   return (
@@ -63,15 +66,30 @@ export default function MobileMenu() {
 
         <nav className="flex flex-col gap-2">
           {mobileLinks.map(({ to, label, icon: Icon }) => (
-            <Link
-              key={to}
-              to={to}
-              className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-sm font-medium text-slate-200 transition hover:border-cyan-400/40 hover:text-white"
-              onClick={() => setIsOpen(false)}
-            >
-              <Icon className="h-5 w-5 text-cyan-300" />
-              <span>{label}</span>
-            </Link>
+            <div key={to}>
+              <Link
+                to={to}
+                className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-sm font-medium text-slate-200 transition hover:border-cyan-400/40 hover:text-white"
+                onClick={() => setIsOpen(false)}
+              >
+                <Icon className="h-5 w-5 text-cyan-300" />
+                <span>{label}</span>
+              </Link>
+              {to === '/podcasts' ? (
+                <div className="ml-6 mt-1 flex flex-col gap-1">
+                  {podcasts.map((show) => (
+                    <Link
+                      key={show.slug}
+                      to={`/podcasts/${show.slug}`}
+                      className="rounded-xl px-4 py-2 text-xs font-medium text-slate-300"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      {show.shortTitle || show.title}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           ))}
           {user ? (
             <>

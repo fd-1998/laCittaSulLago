@@ -1,5 +1,15 @@
-import { CalendarDays, Clock3, ExternalLink, Headphones, Radio } from 'lucide-react'
-import usePodcastsData from '../hooks/usePodcastsData'
+import {
+  ArrowLeft,
+  ArrowRight,
+  CalendarDays,
+  Clock3,
+  ExternalLink,
+  Headphones,
+  Radio,
+} from 'lucide-react'
+import { Link, Navigate, useParams } from 'react-router-dom'
+import AudioPlayer from '../components/AudioPlayer'
+import usePodcastsData, { usePodcastCatalog } from '../hooks/usePodcastsData'
 
 function formatDate(value) {
   if (!value) {
@@ -13,44 +23,87 @@ function formatDate(value) {
   }).format(new Date(value))
 }
 
+export function PodcastsIndexPage() {
+  const { podcasts, loading, error } = usePodcastCatalog()
+
+  return (
+    <main className="podcast-page podcast-index-page">
+      <section className="podcast-index-hero">
+        <p className="app-kicker">Storie da ascoltare</p>
+        <h1>I nostri podcast</h1>
+        <p>
+          Voci, luoghi e memorie di Lecco in una raccolta di serie da esplorare con calma,
+          un episodio alla volta.
+        </p>
+      </section>
+
+      <section className="podcast-catalog" aria-labelledby="podcast-catalog-heading">
+        <div className="podcast-archive-heading">
+          <div>
+            <p className="app-kicker">Scegli cosa ascoltare</p>
+            <h2 id="podcast-catalog-heading">Tutte le serie</h2>
+          </div>
+          {!loading && !error ? <span>{podcasts.length} podcast</span> : null}
+        </div>
+
+        {error ? (
+          <div className="app-message app-message-error" role="alert">
+            <strong>Non siamo riusciti a caricare i podcast.</strong>
+            <span>{error}</span>
+          </div>
+        ) : null}
+        {loading ? (
+          <div className="podcast-loading" role="status">
+            <Headphones aria-hidden="true" />
+            <span>Stiamo caricando le serie…</span>
+          </div>
+        ) : null}
+
+        <div className="podcast-grid">
+          {podcasts.map((show, index) => (
+            <Link className="podcast-card" key={show.id} to={`/podcasts/${show.slug}`}>
+              <div className="podcast-card-cover">
+                <img src={show.image} alt="" />
+                <span>{String(index + 1).padStart(2, '0')}</span>
+              </div>
+              <div className="podcast-card-copy">
+                <p className="app-kicker">Podcast originale</p>
+                <h2>{show.title}</h2>
+                <p>{show.description}</p>
+                <span className="podcast-card-action">
+                  Scopri gli episodi <ArrowRight aria-hidden="true" />
+                </span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+    </main>
+  )
+}
+
 function PodcastsPage() {
-  const {
-    podcasts,
-    selectedSlug,
-    selectPodcast,
-    podcast,
-    episodes,
-    loading,
-    error,
-  } = usePodcastsData()
+  const { podcastSlug } = useParams()
+  const { podcast, episodes, loading, error, notFound } = usePodcastsData(podcastSlug)
+
+  if (notFound) {
+    return <Navigate to="/podcasts" replace />
+  }
 
   return (
     <main className="podcast-page">
-      {podcasts.length > 1 ? (
-        <nav className="podcast-series-picker" aria-label="Serie podcast">
-          {podcasts.map((series) => (
-            <button
-              aria-current={series.slug === selectedSlug ? 'page' : undefined}
-              key={series.id}
-              onClick={() => selectPodcast(series.slug)}
-              type="button"
-            >
-              {series.shortTitle}
-            </button>
-          ))}
-        </nav>
-      ) : null}
       <section className="podcast-page-hero">
         <div className="podcast-cover-wrap">
           {podcast?.image ? <img src={podcast.image} alt={`Copertina di ${podcast.title}`} /> : null}
           <span className="podcast-live-badge"><Radio aria-hidden="true" /> RSS live</span>
         </div>
         <div>
+          <Link className="podcast-back-link" to="/podcasts">
+            <ArrowLeft aria-hidden="true" /> Tutti i podcast
+          </Link>
           <p className="app-kicker">Il nostro podcast</p>
-          <h1>{podcast?.title || 'Lecco — La Città sul Lago'}</h1>
-          <p className="podcast-intro">
-            {podcast?.description || 'La storia di Lecco raccontata da chi la abita, episodio dopo episodio.'}
-          </p>
+          <h1>{podcast?.title || 'Podcast'}</h1>
+          {podcast?.description ? <p className="podcast-intro">{podcast.description}</p> : null}
           {podcast?.spotifyUrl ? (
             <a className="app-primary-button" href={podcast.spotifyUrl} target="_blank" rel="noreferrer">
               Segui su Spotify <ExternalLink aria-hidden="true" />
@@ -96,10 +149,11 @@ function PodcastsPage() {
                 <h3>{episode.title}</h3>
                 <p>{episode.shortDescription}</p>
                 {episode.audioUrl ? (
-                  <audio controls preload="none">
-                    <source src={episode.audioUrl} type={episode.audioType} />
-                    Il tuo browser non supporta la riproduzione audio.
-                  </audio>
+                  <AudioPlayer
+                    src={episode.audioUrl}
+                    type={episode.audioType}
+                    title={episode.title}
+                  />
                 ) : null}
               </div>
               {episode.link ? (
