@@ -132,18 +132,18 @@ function FrontPage() {
         <ParallaxHero />
 
         <section id="ilPodcast" className="frontpage-section podcast-section">
-          <div className="section-kicker"><Mic2 aria-hidden="true" /> Il podcast</div>
+          <div className="section-kicker"><Mic2 aria-hidden="true" /> I podcast</div>
           <div className="podcast-layout">
             <div>
               <h2>Una città da<br /><em>ascoltare.</em></h2>
             </div>
             <div className="section-copy">
               <p>
-                Lecco si racconta attraverso le voci di chi la abita. Un podcast per attraversare
+                Lecco si racconta attraverso le voci di chi la abita. Podcast per attraversare
                 quartieri, memorie e paesaggi con le cuffie nelle orecchie e lo sguardo curioso.
               </p>
               <Link className="text-link" to="/podcasts">
-                Scopri tutti gli episodi <ArrowRight aria-hidden="true" />
+                Scopri tutti i podcast <ArrowRight aria-hidden="true" />
               </Link>
             </div>
           </div>

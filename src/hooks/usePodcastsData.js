@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchPodcastFeed } from '../lib/podcastFeed'
 
-export default function usePodcastsData() {
+export default function usePodcastsData(feedUrl) {
   const [podcast, setPodcast] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -11,7 +11,7 @@ export default function usePodcastsData() {
     setError('')
 
     try {
-      const feed = await fetchPodcastFeed(signal)
+      const feed = await fetchPodcastFeed(feedUrl, signal)
       setPodcast(feed)
     } catch (loadError) {
       if (loadError.name === 'AbortError') {
@@ -21,9 +21,14 @@ export default function usePodcastsData() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [feedUrl])
 
   useEffect(() => {
+    if (!feedUrl) {
+      setLoading(false)
+      return undefined
+    }
+
     const controller = new AbortController()
     void (async () => {
       await loadEpisodes(controller.signal)

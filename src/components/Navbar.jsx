@@ -1,6 +1,8 @@
 import { NavLink } from 'react-router-dom'
+import { ChevronDown } from 'lucide-react'
 import { useTimeline } from '../context/TimelineContext'
 import { useAuth } from '../context/AuthContext'
+import { podcastShows } from '../frontpage/siteConfig'
 
 const linkBase =
   'rounded-full px-4 py-2 text-sm font-medium transition hover:bg-slate-800/80 hover:text-white'
@@ -46,14 +48,29 @@ function Navbar({ variant = 'sticky' }) {
           >
             Cronologia
           </NavLink> */}
-          <NavLink
-            to="/podcasts"
-            className={({ isActive }) =>
-              `${linkBase} ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
-            }
-          >
-            Podcast
-          </NavLink>
+          <div className="group relative">
+            <NavLink
+              to="/podcasts"
+              className={({ isActive }) =>
+                `${linkBase} flex items-center gap-1 ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
+              }
+            >
+              Podcasts <ChevronDown className="h-4 w-4" aria-hidden="true" />
+            </NavLink>
+            <div className="invisible absolute left-1/2 top-full z-10 w-64 -translate-x-1/2 pt-2 opacity-0 transition group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/95 p-2 shadow-2xl">
+                {podcastShows.map((show) => (
+                  <NavLink
+                    key={show.slug}
+                    to={`/podcasts/${show.slug}`}
+                    className="block rounded-xl px-3 py-2 text-sm text-slate-300 transition hover:bg-slate-800/80 hover:text-white"
+                  >
+                    {show.shortTitle || show.title}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          </div>
           {/* <NavLink
             to="/notes"
             className={({ isActive }) =>
@@ -73,14 +90,24 @@ function Navbar({ variant = 'sticky' }) {
             </NavLink>
           ) : null}
           {isAdmin ? (
-            <NavLink
-              to="/admin/users"
-              className={({ isActive }) =>
-                `${linkBase} ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
-              }
-            >
-              Collaboratori
-            </NavLink>
+            <>
+              <NavLink
+                to="/admin/podcasts"
+                className={({ isActive }) =>
+                  `${linkBase} ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
+                }
+              >
+                Gestione podcast
+              </NavLink>
+              <NavLink
+                to="/admin/users"
+                className={({ isActive }) =>
+                  `${linkBase} ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300'}`
+                }
+              >
+                Collaboratori
+              </NavLink>
+            </>
           ) : null}
           {user ? (
             <>
